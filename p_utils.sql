@@ -28,6 +28,11 @@ function truncToSeconds( tTimestamp in timestamp ) return date;
 
 -- Leave only distinct XML nodes of a document.
 function distinguishXML( xml in XMLType ) return XMLType;
+
+-- Evaluate arithmetic expression.
+function calculate( expression in varchar2 ) return number is language java name
+ 'org.quinto.math.Fraction.calculate( java.lang.String ) return java.lang.Double';
+
 end;
 /
 create or replace package body p_utils is

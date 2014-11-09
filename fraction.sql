@@ -1,7 +1,7 @@
 create or replace and compile java source named "org/quinto/math/Fraction" as
-package org.sng.alfa;
+package org.quinto.math;
 
-import java.util.LinkedList;
+import java.util.ArrayList;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -181,9 +181,11 @@ public class Fraction implements Comparable
         return sb.toString();
     }
 
-    public static double calculate( String expression )
+    public static Double calculate( String expression )
     {
-        return eval( expression ).doubleValue();
+        Fraction ret = eval( expression );
+		if ( ret == null ) return null;
+		return new Double( ret.doubleValue() );
     }
 
     public static Fraction eval( String expression )
@@ -241,8 +243,8 @@ public class Fraction implements Comparable
         expression = PLUS_MINUS_PATTERN.matcher( expression ).replaceAll( "-" );
         int length = expression.length();
         StringBuffer sb = new StringBuffer();
-        LinkedList mds = new LinkedList();
-        LinkedList ops = new LinkedList();
+        ArrayList mds = new ArrayList();
+        ArrayList ops = new ArrayList();
         boolean prevCharWasDigit = false;
         for ( int i = 0; i < length; i++ )
         {
