@@ -40,9 +40,9 @@ begin
     select INSTANCE_NAME
 	into tInstanceName
 	from V$INSTANCE;
-    sys.runCommand( 'orakill.exe ' || tInstanceName || ' ' || tSpidn );
+    runCommand( 'orakill.exe ' || tInstanceName || ' ' || tSpidn );
   else
-    sys.runCommand( 'kill -9 ' || tSpidn );
+    runCommand( 'kill -9 ' || tSpidn );
   end if;
 exception
   when NO_DATA_FOUND then
