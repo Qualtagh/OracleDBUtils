@@ -271,7 +271,7 @@ So, there's no ideal method. But some disadvantages can be avoided.
 Distinguishability.
 
 1. It can be achieved by subquery with 'distinct' keyword.
-2. Also, there's a regex solutions described [here][distinct listagg]. But it requires input to be ordered lexicographically.
+2. Also, there's a regex solution described [here][distinct listagg]. But it requires input to be ordered lexicographically.
 3. A comma-separated string can be splitted into values inside a PL/SQL procedure and then concatenated ignoring duplicates
 (in linear time and memory using associative arrays).
 [distinct listagg]:http://dba.stackexchange.com/questions/696/eliminate-duplicates-in-listagg-oracle
