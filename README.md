@@ -96,7 +96,7 @@ ___
 First, compile runCommand.sql under sys. Grant appropriate Java right to access files if needed as described [here][shell commands].
 It's not recommended to grant rights on runCommand procedure to someone else except sys.
 Then, compile p_admin.sql under sys and grant rights/add synonym to target user scheme.
-The target user may also need access to V$SESSION view to find SID of hanged session.
+The target user may also need an access to V$SESSION view to find SID of hanged session.
 ___
 #p_utils
 A package for various tasks: collections manipulation, numeric utilities.
@@ -130,7 +130,7 @@ from SAMPLES
 Output:
 
 VALUE | TO_CHAR | TO_CHAR_FORMATTED | P_UTILS
--: | :- | :- | :-
+--: | :-- | :-- | :--
 -4,67 | -4.67 | -4.67 | -4.67
 -4 | -4 | -4 | -4
 -0,25 | -.25 | -0.25 | -0.25
