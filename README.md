@@ -225,9 +225,9 @@ ___
 String aggregation techniques are described in details [here][string aggregation].
 [string aggregation]:http://oracle-base.com/articles/misc/string-aggregation-techniques.php
 The main properties of the methods described are:
-- Least Oracle version that supports the methos.
-- One line call (no need for nested subqueries).
-- Support of string longer than 4000 characters (CLOB).
+- Least Oracle version that supports the method.
+- One-liner call (no need for nested subqueries).
+- Support of strings longer than 4000 characters (CLOB).
 - Distinguishability of elements aggregated ("distinct" keyword).
 - Lexicographical ordering of elements.
 - Ordering of elements that uses other fields of query.
@@ -269,6 +269,7 @@ A package with syntax similar to SYS_CONNECT_BY_PATH. See: [this thread][hierarc
 So, there's no ideal method. But some disadvantages can be avoided.
 
 Distinguishability.
+
 1. It can be achieved by subquery with 'distinct' keyword.
 2. Also, there's a regex solutions described [here][distinct listagg]. But it requires input to be ordered lexicographically.
 3. A comma-separated string can be splitted into values inside a PL/SQL procedure and then concatenated ignoring duplicates
@@ -276,6 +277,7 @@ Distinguishability.
 [distinct listagg]:http://dba.stackexchange.com/questions/696/eliminate-duplicates-in-listagg-oracle
 
 Ordering.
+
 1. It can be achieved by subquery with ordering.
 2. A lexicographical ordering can be performed inside PL/SQL procedure
 by splitting comma-separated string, ordering and concatenating results back.
