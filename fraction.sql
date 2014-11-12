@@ -184,8 +184,8 @@ public class Fraction implements Comparable
     public static Double calculate( String expression )
     {
         Fraction ret = eval( expression );
-		if ( ret == null ) return null;
-		return new Double( ret.doubleValue() );
+        if ( ret == null ) return null;
+        return new Double( ret.doubleValue() );
     }
 
     public static Fraction eval( String expression )

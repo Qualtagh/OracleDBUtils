@@ -35,11 +35,11 @@ begin
        V$PROCESS p
   where s.SID = tSid
     and s.PADDR = p.ADDR
-	and s.USERNAME = user;
+    and s.USERNAME = user;
   if dbms_utility.port_string like '%WIN%' then
     select INSTANCE_NAME
-	into tInstanceName
-	from V$INSTANCE;
+    into tInstanceName
+    from V$INSTANCE;
     runCommand( 'orakill.exe ' || tInstanceName || ' ' || tSpidn );
   else
     runCommand( 'kill -9 ' || tSpidn );
