@@ -72,7 +72,7 @@ After call to pauseAllJobs( tIncr => 1 / 144 ) we get:
 
 It just shifts the existing NEXT_DATE (from USER_JOBS) if tIncr is set.
 
-So, more formally, this method kills all jobs and schedules them to launch at max( sysdate + tMin, min( sysdate + tMax, NEXT_DATE + tIncr ) ).
+So, more formally, this method kills all jobs and schedules them to launch at min( sysdate + tMax, max( sysdate + tMin, NEXT_DATE + tIncr ) ).
 ___
 ```pl-sql
 procedure pauseJob( tJob in number, tMin in number default 1 / 144, tMax in number default null, tIncr in number default null );
