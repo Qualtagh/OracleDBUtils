@@ -24,6 +24,18 @@ Contents:
   7. [calculate](#calculate)
 3. [p_stack](#p_stack)
   1. [getCallStack](#getCallStack)
+  2. [whoAmI](#whoAmI)
+  3. [whoCalledMe](#whoCalledMe)
+  4. [getCallStackLine](#getCallStackLine)
+  5. [getDynamicDepth](#getDynamicDepth)
+  6. [getLexicalDepth](#getLexicalDepth)
+  7. [getUnitLine](#getUnitLine)
+  8. [getOwner](#getOwner)
+  9. [getProgram](#getProgram)
+  10. [getProgramType](#getProgramType)
+  11. [getSubprogram](#getSubprogram)
+  12. [getSubprogramType](#getSubprogramType)
+  13. [getConcatenatedSubprograms](#getConcatenatedSubprograms)
 4. [String aggregation](#string-aggregation)
 5. [Links to other packages from various authors](#links-to-other-packages-from-various-authors)
 
@@ -270,10 +282,16 @@ A package for call stack control.
 
 There do exist [predefined inquiry directives][predefined inquiry directives] `$$PLSQL_LINE` and `$$PLSQL_UNIT` which allow to get information about current stored program unit and source code line in it.
 Also, there's a function `dbms_utility.format_call_stack` which allows to get the whole call stack. But it contains only stored program units names and source code line numbers too.
-Oracle 12 introduces a package `utl_call_stack` which provides information about subprogram units. In Oracle versions prior to 12, there's no way to get subprogram name but parsing the source code.
+`V$SESSION` view contains fields `PLSQL_ENTRY_OBJECT_ID`, `PLSQL_ENTRY_SUBPROGRAM_ID`, `PLSQL_OBJECT_ID`, `PLSQL_SUBPROGRAM_ID` which can lead to a subprogram. But that subprogram should be declared in package. Inner package body subprograms aren't traced.
+Oracle 12 introduces a package `utl_call_stack` which provides information about subprogram units. In Oracle versions prior to 12, there's no way to get subprogram name except parsing the source code.
 The purpose of package `p_stack` is to find subprogram name by parsing the source code according to information returned by `dbms_utility.format_call_stack`.
 
 There are two versions of this package released: one for Oracle 9 (`p_stack.9.sql`) and another one for Oracle 10 and 11 (`p_stack.sql`).
+
+Anonymous classes source code is retrieved via views `V$SQL`, `V$SQLAREA` and `V$SQLTEXT_WITH_NEWLINES`. Stored program units code is gained via `ALL_SOURCE`.
+This package is written in pure PL/SQL. Double quoted identifiers  are supported. Strings `q`-notation is supported too. Procedures and functions without definitions are skipped properly.
+Conditional compilation is __not__ supported at the moment, unfortunately. Calls via database link aren't traced by `dbms_utility.format_call_stack` so they aren't traced by `p_stack` too.
+One-liner subprogram definitions cannot be distinguished (see example below).
 [predefined inquiry directives]:http://docs.oracle.com/cd/B19306_01/appdev.102/b14261/fundamentals.htm#BEIBIDCE
 ___
 <a name="getCallStack"></a>
@@ -304,6 +322,195 @@ It's the type of inner subprogram.
 
 `SUBPROGRAM NAME` is the name of inner subprogram.
 If there are several inner units then all of them are separated by dots.
+
+**Sample usage:**
+```pl-sql
+create package APCKG is
+  procedure PROC;
+end;
+/
+create package body APCKG is
+  procedure PROC is
+    procedure "INNER/proc" is
+    begin
+      dbms_output.put_line( p_stack.whoAmI );
+    end;
+  begin
+    "INNER/proc";
+  end;
+end;
+/
+begin
+  APCKG.PROC;
+end;
+```
+Output:
+```
+5: YOUR_SCHEMA.PACKAGE BODY APCKG.PROCEDURE PROC.PROCEDURE "INNER/proc"
+```
+One-liner definitions cannot be distinguished. Consider the following example:
+```pl-sql
+create or replace procedure outer_proc( t in number ) is
+procedure inner_proc1 is begin dbms_output.put_line( dbms_utility.format_call_stack ); end; procedure inner_proc2 is begin dbms_output.put_line( dbms_utility.format_call_stack ); end;
+begin
+  if t = 1 then inner_proc1; else inner_proc2; end if;
+end;
+/
+begin
+  outer_proc( trunc( dbms_random.value( 1, 3 ) ) );
+end;
+```
+The output is:
+```
+----- PL/SQL Call Stack -----
+  object      line  object
+  handle    number  name
+C4462284         2  procedure YOUR_SCHEMA.OUTER_PROC
+C4462284         4  procedure YOUR_SCHEMA.OUTER_PROC
+C249BADC         2  anonymous block
+```
+Line 2 contains two subprograms. It's impossible to find out which one was called.
+___
+<a name="whoAmI"></a>
+```pl-sql
+function whoAmI return varchar2;
+```
+Returns the stack information of a current program unit.
+Example:
+```pl-sql
+declare
+  procedure inner_proc is
+  begin
+    dbms_output.put_line( p_stack.whoAmI );
+  end;
+begin
+  inner_proc;
+end;
+```
+Output:
+```
+4: YOUR_SCHEMA.ANONYMOUS BLOCK.PROCEDURE INNER_PROC
+```
+See output format description of function `getCallStack`.
+___
+<a name="whoCalledMe"></a>
+```pl-sql
+function whoCalledMe return varchar2;
+```
+Returns the stack information of a program unit which has called currently executing code.
+___
+<a name="getCallStackLine"></a>
+```pl-sql
+function getCallStackLine( tCallStack in varchar2, tDepth in number ) return varchar2;
+```
+Returns one stack line at a given depth. A common example for all further functions:
+```pl-sql
+declare
+  procedure outer_proc is
+    procedure inner_proc is
+      tCallStack varchar2( 4000 );
+      tDepth number;
+      tCallLine varchar2( 4000 );
+    begin
+      tCallStack := p_stack.getCallStack;
+      tDepth := p_stack.getDynamicDepth( tCallStack );
+      dbms_output.put_line( 'DEPTH LINE OWNER       LEX  PROGRAM_TYPE    PROGRAM SUBPROGRAM_TYPE SUBPROGRAM   CONCATENATED' );
+      for i in 1 .. tDepth loop
+        tCallLine := p_stack.getCallStackLine( tCallStack, i );
+        dbms_output.put( rpad( i, 6 ) );
+        dbms_output.put( rpad( p_stack.getUnitLine( tCallLine ), 5 ) );
+        dbms_output.put( rpad( p_stack.getOwner( tCallLine ), 12 ) );
+        dbms_output.put( rpad( p_stack.getLexicalDepth( tCallLine ), 5 ) );
+        dbms_output.put( rpad( p_stack.getProgramType( tCallLine ), 16 ) );
+        dbms_output.put( rpad( nvl( p_stack.getProgram( tCallLine ), ' ' ), 8 ) );
+        dbms_output.put( rpad( nvl( p_stack.getSubprogramType( tCallLine ), ' ' ), 16 ) );
+        dbms_output.put( rpad( nvl( p_stack.getSubprogram( tCallLine ), ' ' ), 13 ) );
+        dbms_output.put_line( p_stack.getConcatenatedSubprograms( tCallLine ) );
+      end loop;
+    end;
+  begin
+    inner_proc;
+  end;
+begin
+  outer_proc;
+end;
+```
+Output:
+```
+DEPTH LINE OWNER       LEX  PROGRAM_TYPE    PROGRAM SUBPROGRAM_TYPE SUBPROGRAM   CONCATENATED
+1     73   YOUR_SCHEMA 1    PACKAGE BODY    P_STACK FUNCTION        GETCALLSTACK P_STACK.GETCALLSTACK
+2     8    YOUR_SCHEMA 2    ANONYMOUS BLOCK         PROCEDURE       INNER_PROC   ANONYMOUS BLOCK.OUTER_PROC.INNER_PROC
+3     25   YOUR_SCHEMA 1    ANONYMOUS BLOCK         PROCEDURE       OUTER_PROC   ANONYMOUS BLOCK.OUTER_PROC
+4     28   YOUR_SCHEMA 0    ANONYMOUS BLOCK         ANONYMOUS BLOCK              ANONYMOUS BLOCK
+```
+The rest functions simulate the behaviour of `utl_call_stack` package.
+___
+<a name="getDynamicDepth"></a>
+```pl-sql
+function getDynamicDepth( tCallStack in varchar2 default '' ) return number;
+```
+Returns current stack depth including the call of this function. Similar to `utl_call_stack.dynamic_depth`.
+
+`tCallStack` is information returned by `getCallStack`. Can be omitted.
+___
+<a name="getLexicalDepth"></a>
+```pl-sql
+function getLexicalDepth( tCallStack in varchar2, tDepth in number default null ) return number;
+```
+Returns a depth of a current program unit. Similar to `utl_call_stack.lexical_depth`.
+Stored procedures, functions, packages and their bodies, type bodies, triggers and anonymous blocks have a depth equal to `0`.
+Inner procedures and functions have depth equal to `1 + depth of parent program unit`.
+
+`tCallStack` is information returned by getCallStack if `tDepth` is set, or information returned by `getCallStackLine`.
+
+`tDepth` is a number of requested line if `tCallStack` = `getCallStack`, `null` otherwise.
+___
+<a name="getUnitLine"></a>
+```pl-sql
+function getUnitLine( tCallStack in varchar2, tDepth in number default null ) return number;
+```
+Returns a source line number as returned by `dbms_utility.format_call_stack`. Similar to `utl_call_stack.unit_line`.
+___
+<a name="getOwner"></a>
+```pl-sql
+function getOwner( tCallStack in varchar2, tDepth in number default null ) return varchar2;
+```
+Returns owner of a requested program unit, or a parsing schema for an anonymous block.
+If the parsing schema name could not be retrieved then OWNER equals to current schema name.
+Similar to `utl_call_stack.owner`.
+___
+<a name="getProgram"></a>
+```pl-sql
+function getProgram( tCallStack in varchar2, tDepth in number default null ) return varchar2;
+```
+Returns name of a requested stored procedure. Empty string for anonymous block. The name returned won't contain double quotes.
+___
+<a name="getProgramType"></a>
+```pl-sql
+function getProgramType( tCallStack in varchar2, tDepth in number default null ) return varchar2;
+```
+Returns a type of a requested stored procedure. One of:
+`ANONYMOUS BLOCK`, `PROCEDURE`, `FUNCTION`, `TRIGGER`, `PACKAGE`, `PACKAGE BODY`, `TYPE BODY`.
+___
+<a name="getSubprogram"></a>
+```pl-sql
+function getSubprogram( tCallStack in varchar2, tDepth in number default null ) return varchar2;
+```
+Returns a name of a requested innermost subprogram. The name returned never contains double quotes. Similar to `utl_call_stack.subprogram`.
+___
+<a name="getSubprogramType"></a>
+```pl-sql
+function getSubprogramType( tCallStack in varchar2, tDepth in number default null ) return varchar2;
+```
+Returns a type of requested innermost subprogram. Value returned is one of `PROCEDURE` or `FUNCTION`.
+___
+<a name="getConcatenatedSubprograms"></a>
+```pl-sql
+function getConcatenatedSubprograms( tCallStack in varchar2, tDepth in number default null ) return varchar2;
+```
+Returns the hierarchy of names separated by dot from outermost to innermost program unit.
+If one of program units in this hierarchy has double quotes in its name, they would be preserved.
+Similar to `utl_call_stack.concatenate_subprogram`.
 ___
 **Installation notes:**
 
