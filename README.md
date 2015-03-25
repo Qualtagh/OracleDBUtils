@@ -1,6 +1,17 @@
 #OracleDBUtils
 Helpful PL/SQL utilities for Oracle database.
 Written and tested for Oracle 10.2 (should work for later versions, some parts may work for earlier versions too).
+
+Contents:
+
+1. [p_admin](#p_admin)
+2. [p_utils](#p_utils)
+3. [p_stack](#p_stack)
+4. [String aggregation](#string-aggregation)
+5. [Links to other packages from various authors](#links-to-other-packages-from-various-authors)
+
+Released into public domain.
+
 ___
 #p_admin
 A package for sessions and jobs control.
@@ -8,6 +19,7 @@ If jobs are intensively running all the time, it's hard to compile source code u
 So we need to stop jobs before this process. But inner database methods (such as "alter system kill session" or marking job as broken) may take too long while waiting for resources to be disposed or waiting for the job to be finished. A detailed description of various methods of killing sessions can be found [here][killing sessions]. This package offers methods for immediate jobs and sessions termination. Usually this task is performed by DBAs, not by developers. But sometimes it may ease the process of frequent compilations for both DBAs and developers (by giving more privileges for latter ones), e.g. on test databases.
 [killing sessions]:http://oracle-base.com/articles/misc/killing-oracle-sessions.php
 ___
+<a name="killSession">a</a>
 ```pl-sql
 procedure killSession( tSid in number );
 ```
