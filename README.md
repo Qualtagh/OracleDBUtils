@@ -7,8 +7,23 @@ Contents:
 1. [p_admin](#p_admin)
   1. [killSession](#killSession)
   2. [killAllSessions](#killAllSessions)
+  3. [killDevelopersSessions](#killDevelopersSessions)
+  4. [killUserSessions](#killUserSessions)
+  5. [killUserTestSessions](#killUserTestSessions)
+  6. [killJob](#killJob)
+  7. [pauseAllJobs](#pauseAllJobs)
+  8. [pauseJob](#pauseJob)
+  9. [pauseJobsLike](#pauseJobsLike)
 2. [p_utils](#p_utils)
+  1. [numberToChar](#numberToChar)
+  2. [getAssociativeArray](#getAssociativeArray)
+  3. [getAssociativeArrayKeys](#getAssociativeArrayKeys)
+  4. [getAssociativeArrayValues](#getAssociativeArrayValues)
+  5. [truncToSeconds](#truncToSeconds)
+  6. [distinguishXML](#distinguishXML)
+  7. [calculate](#calculate)
 3. [p_stack](#p_stack)
+  1. [getCallStack](#getCallStack)
 4. [String aggregation](#string-aggregation)
 5. [Links to other packages from various authors](#links-to-other-packages-from-various-authors)
 
@@ -36,27 +51,32 @@ procedure killAllSessions;
 ```
 This procedure just calls killSession for all sessions available at V$SESSION view ignoring system sessions and a current one. It's useful for releasing locks on database objects.
 ___
+<a name="killDevelopersSessions"></a>
 ```pl-sql
 procedure killDevelopersSessions;
 ```
 Kill sessions of all users logged in with their accounts (sessions, for which OSUSER differs from 'SYSTEM'). Modify it not to kill sessions of application server such as Tomcat by adding corresponding user name (if it's not NT AUTHORITY\SYSTEM) to exceptions inside this procedure.
 ___
+<a name="killUserSessions"></a>
 ```pl-sql
 procedure killUserSessions;
 ```
 Kill sessions of current user (OSUSER in V$SESSION). It's useful if your query takes too long to finish and cannot be killed immediately by "alter system kill session".
 ___
+<a name="killUserTestSessions"></a>
 ```pl-sql
 procedure killUserTestSessions;
 ```
 Kill debug (Test Window) sessions of current user when logged in via [PL/SQL Developer].
 [PL/SQL Developer]:http://www.allroundautomations.com/plsqldev.html
 ___
+<a name="killJob"></a>
 ```pl-sql
 procedure killJob( tJob in number );
 ```
 Stop DBMS_JOB execution by a given identifier (JOB from view USER_JOBS).
 ___
+<a name="pauseAllJobs"></a>
 ```pl-sql
 procedure pauseAllJobs( tMin in number default 1 / 144, tMax in number default null, tIncr in number default null );
 ```
@@ -89,11 +109,13 @@ It just shifts the existing NEXT_DATE (from USER_JOBS) if tIncr is set.
 
 So, more formally, this method kills all jobs and schedules them to launch at min( sysdate + tMax, max( sysdate + tMin, NEXT_DATE + tIncr ) ).
 ___
+<a name="pauseJob"></a>
 ```pl-sql
 procedure pauseJob( tJob in number, tMin in number default 1 / 144, tMax in number default null, tIncr in number default null );
 ```
 This method pauses (kills and reschedules) a job by a given identifier.
 ___
+<a name="pauseJobsLike"></a>
 ```pl-sql
 procedure pauseJobsLike( tLikeCondition in varchar2, tMin in number default 1 / 144, tMax in number default null, tIncr in number default null, tJob in number default null );
 ```
@@ -116,6 +138,7 @@ ___
 #p_utils
 A package for various tasks: collections manipulation, numeric utilities.
 ___
+<a name="numberToChar"></a>
 ```pl-sql
 function numberToChar( tNumber in number ) return varchar2;
 ```
@@ -160,6 +183,7 @@ VALUE | TO_CHAR | TO_CHAR_FORMATTED | P_UTILS
 
 As you can see, to_char format depends on the length of the input, so it's hard (verbose) to achieve the same functionality.
 ___
+<a name="getAssociativeArray"></a>
 ```pl-sql
 function getAssociativeArray( tKeys in num_table ) return dbms_sql.number_table;
 ```
@@ -193,6 +217,7 @@ end;
 ```
 These methods are useful when keys and values are the results of bulk select statement. And further constant-time access to them is required.
 ___
+<a name="getAssociativeArrayKeys"></a>
 ```pl-sql
 function getAssociativeArrayKeys( tMap in dbms_sql.number_table ) return num_table;
 function getAssociativeArrayKeys( tMap in dbms_sql.date_table ) return num_table;
@@ -200,6 +225,7 @@ function getAssociativeArrayKeys( tMap in dbms_sql.varchar2_table ) return num_t
 ```
 Get an array of keys from a given map.
 ___
+<a name="getAssociativeArrayValues"></a>
 ```pl-sql
 function getAssociativeArrayValues( tMap in dbms_sql.number_table ) return num_table;
 function getAssociativeArrayValues( tMap in dbms_sql.date_table ) return date_table;
@@ -207,6 +233,7 @@ function getAssociativeArrayValues( tMap in dbms_sql.varchar2_table ) return str
 ```
 Get an array of values from a given map.
 ___
+<a name="truncToSeconds"></a>
 ```pl-sql
 function truncToSeconds( tTimestamp in timestamp ) return date;
 ```
@@ -215,11 +242,13 @@ Oracle rounds (half up) timestamp to date when using cast( ts as date ) in versi
 This function always truncates timestamp to date.
 [timestamp rounding]:http://stackoverflow.com/questions/1712208/oracle-casttimestamp-as-date
 ___
+<a name="distinguishXML"></a>
 ```pl-sql
 function distinguishXML( xml in XMLType ) return XMLType;
 ```
 Leave only distinct XML nodes of a document. This method is useful for string aggregation (see section below).
 ___
+<a name="calculate"></a>
 ```pl-sql
 function calculate( expression in varchar2 ) return number;
 ```
@@ -240,7 +269,41 @@ ___
 A package for call stack control.
 
 There do exist [predefined inquiry directives][predefined inquiry directives] `$$PLSQL_LINE` and `$$PLSQL_UNIT` which allow to get information about current stored program unit and source code line in it.
+Also, there's a function `dbms_utility.format_call_stack` which allows to get the whole call stack. But it contains only stored program units names and source code line numbers too.
+Oracle 12 introduces a package `utl_call_stack` which provides information about subprogram units. In Oracle versions prior to 12, there's no way to get subprogram name but parsing the source code.
+The purpose of package `p_stack` is to find subprogram name by parsing the source code according to information returned by `dbms_utility.format_call_stack`.
+
+There are two versions of this package released: one for Oracle 9 (`p_stack.9.sql`) and another one for Oracle 10 and 11 (`p_stack.sql`).
 [predefined inquiry directives]:http://docs.oracle.com/cd/B19306_01/appdev.102/b14261/fundamentals.htm#BEIBIDCE
+___
+<a name="getCallStack"></a>
+```pl-sql
+function getCallStack( tDepth in number default null ) return varchar2;
+```
+Returns a call stack. The call of this procedure is included and is at the first line.
+`tDepth` sets which line of stack to show. Lesser numbers are most recent calls. Numeration starts from 1.
+The call of this procedure has depth = 1.
+If `tDepth` is null then the whole stack is returned as a string where lines are delimited by "new line" symbol.
+
+Output format: `LINE || ': ' || OWNER || '.' || PROGRAM TYPE || [ ' ' || PROGRAM NAME ]? || [ '.' || SUBPROGRAM TYPE || ' ' || SUBPROGRAM NAME ]*`
+
+`LINE` is a source code line number as returned by `dbms_utility.format_call_stack`.
+
+`OWNER` is an owner of program unit being called, or parsing schema name for anonymous blocks.
+If the parsing schema name could not be retrieved then `OWNER` equals to current schema name.
+
+`PROGRAM TYPE` is one of `ANONYMOUS BLOCK`, `PACKAGE`, `PACKAGE BODY`, `TYPE BODY`, `TRIGGER`, `PROCEDURE`, `FUNCTION`.
+It's the type of outermost program unit.
+
+`PROGRAM NAME` is the name of program unit being called as returned by `dbms_utility.format_call_stack`.
+It's absent for anonymous blocks.
+It's double quoted if the source code contains its name in double quotes.
+
+`SUBPROGRAM TYPE` is one of `PROCEDURE` or `FUNCTION`.
+It's the type of inner subprogram.
+
+`SUBPROGRAM NAME` is the name of inner subprogram.
+If there are several inner units then all of them are separated by dots.
 ___
 **Installation notes:**
 
