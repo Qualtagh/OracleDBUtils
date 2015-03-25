@@ -281,7 +281,7 @@ ___
 A package for call stack control.
 
 There do exist [predefined inquiry directives][predefined inquiry directives] `$$PLSQL_LINE` and `$$PLSQL_UNIT` which allow to get information about current stored program unit and source code line in it.
-Also, there's a function `dbms_utility.format_call_stack` which allows to get the whole call stack. But it contains only stored program units names and source code line numbers too.
+Also, there's a function `dbms_utility.format_call_stack` which allows to get the whole call stack. But it contains only stored program unit names and source code line numbers too.
 `V$SESSION` view contains fields `PLSQL_ENTRY_OBJECT_ID`, `PLSQL_ENTRY_SUBPROGRAM_ID`, `PLSQL_OBJECT_ID`, `PLSQL_SUBPROGRAM_ID` which can lead to a subprogram. But that subprogram should be declared in package. Inner package body subprograms aren't traced.
 Oracle 12 introduces a package `utl_call_stack` which provides information about subprogram units. In Oracle versions prior to 12, there's no way to get subprogram name except parsing the source code.
 The purpose of package `p_stack` is to find subprogram name by parsing the source code according to information returned by `dbms_utility.format_call_stack`.
@@ -303,7 +303,7 @@ Returns a call stack. The call of this procedure is included and is at the first
 The call of this procedure has depth = 1.
 If `tDepth` is null then the whole stack is returned as a string where lines are delimited by "new line" symbol.
 
-Output format: `LINE || ': ' || OWNER || '.' || PROGRAM TYPE || [ ' ' || PROGRAM NAME ]? || [ '.' || SUBPROGRAM TYPE || ' ' || SUBPROGRAM NAME ]*`
+Output format of each stack line: `LINE || ': ' || OWNER || '.' || PROGRAM TYPE || [ ' ' || PROGRAM NAME ]? || [ '.' || SUBPROGRAM TYPE || ' ' || SUBPROGRAM NAME ]*`
 
 `LINE` is a source code line number as returned by `dbms_utility.format_call_stack`.
 
@@ -392,12 +392,24 @@ Output:
 4: YOUR_SCHEMA.ANONYMOUS BLOCK.PROCEDURE INNER_PROC
 ```
 See output format description of function `getCallStack`.
+
+If you just need to get the name of current subprogram, use:
+```pl-sql
+dbms_output.put_line( p_stack.getSubprogram( p_stack.whoAmI ) );
+```
+Or this variant for the fully qualified subprogram name:
+```pl-sql
+dbms_output.put_line( p_stack.getConcatenatedSubprograms( p_stack.whoAmI ) );
+```
 ___
 <a name="whoCalledMe"></a>
 ```pl-sql
 function whoCalledMe return varchar2;
 ```
-Returns the stack information of a program unit which has called currently executing code.
+Returns the stack information of a program unit which has called currently executing code. Sample usage:
+```pl-sql
+dbms_output.put_line( p_stack.getConcatenatedSubprograms( p_stack.whoCalledMe ) );
+```
 ___
 <a name="getCallStackLine"></a>
 ```pl-sql
@@ -514,7 +526,7 @@ Similar to `utl_call_stack.concatenate_subprogram`.
 ___
 **Installation notes:**
 
-Compile types.sql. Then compile p_stack.sql for Oracle 10 and 11, or p_stack.9.sql for Oracle 9. If the `owa` package is not available, replace its usages by commented `chr` functions. If the views `V$SQL`, `V$SQLAREA` or `V$SQLTEXT_WITH_NEWLINES` are not available, just remove those blocks.
+Compile types.sql. Then compile p_stack.sql for Oracle 10 and 11, or p_stack.9.sql for Oracle 9. If the `owa` package is not available, replace its usages by commented `chr` functions. If the views `V$SQL`, `V$SQLAREA` or `V$SQLTEXT_WITH_NEWLINES` are not available, just remove those blocks. The source code of anonymous blocks won't be parsed in this case. But it's not required for most applications.
 ___
 #String aggregation
 String aggregation techniques are described in details [here][string aggregation].
