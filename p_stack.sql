@@ -7,6 +7,7 @@ create or replace package p_stack is
 -- Output format: LINE || ': ' || OWNER || '.' || PROGRAM TYPE || [ ' ' || PROGRAM NAME ]? || [ '.' || SUBPROGRAM TYPE || ' ' || SUBPROGRAM NAME ]*
 -- LINE is a source code line number as returned by dbms_utility.format_call_stack.
 -- OWNER is an owner of program unit being called, or parsing schema name for anonymous blocks.
+-- If the parsing schema name could not be retrieved then OWNER equals to current schema name.
 -- PROGRAM TYPE is one of ANONYMOUS BLOCK, PACKAGE, PACKAGE BODY, TYPE BODY, TRIGGER, PROCEDURE, FUNCTION.
 -- It's the type of outermost program unit.
 -- PROGRAM NAME is the name of program unit being called as returned by dbms_utility.format_call_stack.
@@ -52,6 +53,7 @@ function getLexicalDepth( tCallStack in varchar2, tDepth in number default null 
 function getUnitLine( tCallStack in varchar2, tDepth in number default null ) return number;
 
 -- Returns owner of a requested program unit, or a parsing schema for an anonymous block.
+-- If the parsing schema name could not be retrieved then OWNER equals to current schema name.
 -- tCallStack: information returned by getCallStack if tDepth is set or information returned by getCallStackLine.
 -- tDepth: number of requested line if tCallStack = getCallStack, null otherwise.
 -- See: utl_call_stack.owner
@@ -124,6 +126,7 @@ cursor getSource( tOwner in varchar2, tName in varchar2, tType in varchar2, tLin
 -- Output format: LINE || ': ' || OWNER || '.' || PROGRAM TYPE || [ ' ' || PROGRAM NAME ]? || [ '.' || SUBPROGRAM TYPE || ' ' || SUBPROGRAM NAME ]*
 -- LINE is a source code line number as returned by dbms_utility.format_call_stack.
 -- OWNER is an owner of program unit being called, or parsing schema name for anonymous blocks.
+-- If the parsing schema name could not be retrieved then OWNER equals to current schema name.
 -- PROGRAM TYPE is one of ANONYMOUS BLOCK, PACKAGE, PACKAGE BODY, TYPE BODY, TRIGGER, PROCEDURE, FUNCTION.
 -- It's the type of outermost program unit.
 -- PROGRAM NAME is the name of program unit being called as returned by dbms_utility.format_call_stack.
@@ -137,7 +140,8 @@ function getCallStack( tDepth in number default null ) return varchar2 is
   tCallPositions varchar2( 4000 );
   tCallPositionsLine varchar2( 255 );
   tReached pls_integer;
-  tHandle varchar2( 8 );
+  tHandle varchar2( 16 );
+  tHashValue number;
   tOwner varchar2( 255 );
   tName varchar2( 255 );
   tLine number;
@@ -179,8 +183,13 @@ begin
     if tReached = 0 or tDepth != tReached then
       goto NEXT_CALL_POSITION;
     end if;
-    tHandle := substr( tCallPositionsLine, 1, 8 );
-    tCallPositionsLine := ltrim( substr( tCallPositionsLine, 9 ) );
+    pos := instr( tCallPositionsLine, ' ' );
+    if pos > 0 then
+      tHandle := substr( tCallPositionsLine, 1, pos - 1 );
+      tCallPositionsLine := ltrim( substr( tCallPositionsLine, pos ) );
+    else
+      tHandle := '';
+    end if;
     pos := instr( tCallPositionsLine, ' ' );
     if pos > 0 then
       tLine := to_number( substr( tCallPositionsLine, 1, pos - 1 ) );
@@ -221,16 +230,20 @@ begin
       open getSource( tOwner, tName, tType, tLine );
       tCallStack := str_table( '' );
     else
-      begin
-        select SQL_FULLTEXT, ADDRESS
-        into tSqlFullText, tHandle
-        from V$SQL
-        where CHILD_ADDRESS = tHandle;
-      exception
-        when NO_DATA_FOUND then
-          tSqlFullText := null;
-          tHandle := '';
-      end;
+      if tHandle is null then
+        tSqlFullText := null;
+      else
+        begin
+          select SQL_FULLTEXT, ADDRESS, HASH_VALUE
+          into tSqlFullText, tHandle, tHashValue
+          from V$SQL
+          where CHILD_ADDRESS = tHandle;
+        exception
+          when NO_DATA_FOUND then
+            tSqlFullText := null;
+            tHandle := '';
+        end;
+      end if;
       tCurrentLine := 0;
       tCallStack := str_table( '', 'ANON' );
       if tHandle is not null then
@@ -238,7 +251,8 @@ begin
           select PARSING_SCHEMA_NAME
           into tOwner
           from V$SQLAREA
-          where ADDRESS = tHandle;
+          where ADDRESS = tHandle
+            and HASH_VALUE = tHashValue;
         exception
           when NO_DATA_FOUND then
             null;
@@ -532,7 +546,7 @@ begin
       ret := ret || CHAR_NEW_LINE;
     end if;
     if tOwner is null then
-      tOwner := UNKNOWN_OWNER;
+      tOwner := user; -- UNKNOWN_OWNER;
     end if;
     ret := ret || tLine || ': ' || tOwner || '.' || tCallStackLine;
     exit when tDepth = tReached;
@@ -635,6 +649,7 @@ begin
 end;
 
 -- Returns owner of a requested program unit, or a parsing schema for an anonymous block.
+-- If the parsing schema name could not be retrieved then OWNER equals to current schema name.
 -- tCallStack: information returned by getCallStack if tDepth is set or information returned by getCallStackLine.
 -- tDepth: number of requested line if tCallStack = getCallStack, null otherwise.
 -- See: utl_call_stack.owner

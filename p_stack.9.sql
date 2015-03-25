@@ -1,0 +1,819 @@
+create or replace package p_stack is
+
+-- Returns a call stack. The call of this procedure is included and is at the first line.
+-- tDepth: which line of stack to show. Lesser numbers are most recent calls. Numeration starts from 1.
+-- The call of this procedure has depth = 1.
+-- If tDepth is null then the whole stack is returned as a string where lines are delimited by "new line" symbol.
+-- Output format: LINE || ': ' || OWNER || '.' || PROGRAM TYPE || [ ' ' || PROGRAM NAME ]? || [ '.' || SUBPROGRAM TYPE || ' ' || SUBPROGRAM NAME ]*
+-- LINE is a source code line number as returned by dbms_utility.format_call_stack.
+-- OWNER is an owner of program unit being called, or parsing schema name for anonymous blocks.
+-- If the parsing schema name could not be retrieved then OWNER equals to current schema name.
+-- PROGRAM TYPE is one of ANONYMOUS BLOCK, PACKAGE, PACKAGE BODY, TYPE BODY, TRIGGER, PROCEDURE, FUNCTION.
+-- It's the type of outermost program unit.
+-- PROGRAM NAME is the name of program unit being called as returned by dbms_utility.format_call_stack.
+-- It's absent for anonymous blocks.
+-- It's double quoted if the source code contains its name in double quotes.
+-- SUBPROGRAM TYPE is one of PROCEDURE or FUNCTION.
+-- It's the type of inner subprogram.
+-- SUBPROGRAM NAME is the name of inner subprogram.
+-- If there are several inner units then all of them are separated by dots.
+function getCallStack( tDepth in number default null ) return varchar2;
+
+-- Returns the stack information of a current program unit.
+-- See output format description of function getCallStack.
+function whoAmI return varchar2;
+
+-- Returns the stack information of a program unit which has called currently executing code.
+-- See output format description of function getCallStack.
+function whoCalledMe return varchar2;
+
+-- Returns one stack line at a given depth.
+-- See output format description of function getCallStack.
+-- tCallStack: information returned by getCallStack.
+-- tDepth: number of requested line.
+function getCallStackLine( tCallStack in varchar2, tDepth in number ) return varchar2;
+
+-- Returns current stack depth including the call of this function.
+-- tCallStack: information returned by getCallStack. Can be omitted.
+-- See: utl_call_stack.dynamic_depth
+function getDynamicDepth( tCallStack in varchar2 default '' ) return number;
+
+-- Returns a depth of a current program unit.
+-- Stored procedures, functions, packages and their bodies, type bodies, triggers and anonymous blocks have a depth equal to 0.
+-- Inner procedures and functions have depth equal to 1 + depth of parent program unit.
+-- tCallStack: information returned by getCallStack if tDepth is set or information returned by getCallStackLine.
+-- tDepth: number of requested line if tCallStack = getCallStack, null otherwise.
+-- See: utl_call_stack.lexical_depth
+function getLexicalDepth( tCallStack in varchar2, tDepth in number default null ) return number;
+
+-- Returns a source line number as returned by dbms_utility.format_call_stack.
+-- tCallStack: information returned by getCallStack if tDepth is set or information returned by getCallStackLine.
+-- tDepth: number of requested line if tCallStack = getCallStack, null otherwise.
+-- See: utl_call_stack.unit_line
+function getUnitLine( tCallStack in varchar2, tDepth in number default null ) return number;
+
+-- Returns owner of a requested program unit, or a parsing schema for an anonymous block.
+-- If the parsing schema name could not be retrieved then OWNER equals to current schema name.
+-- tCallStack: information returned by getCallStack if tDepth is set or information returned by getCallStackLine.
+-- tDepth: number of requested line if tCallStack = getCallStack, null otherwise.
+-- See: utl_call_stack.owner
+function getOwner( tCallStack in varchar2, tDepth in number default null ) return varchar2;
+
+-- Returns name of a requested stored procedure. Empty string for anonymous block.
+-- The name returned won't contain double quotes.
+-- tCallStack: information returned by getCallStack if tDepth is set or information returned by getCallStackLine.
+-- tDepth: number of requested line if tCallStack = getCallStack, null otherwise.
+function getProgram( tCallStack in varchar2, tDepth in number default null ) return varchar2;
+
+-- Returns a type of a requested stored procedure. One of:
+-- ANONYMOUS BLOCK, PROCEDURE, FUNCTION, TRIGGER, PACKAGE, PACKAGE BODY, TYPE BODY.
+-- tCallStack: information returned by getCallStack if tDepth is set or information returned by getCallStackLine.
+-- tDepth: number of requested line if tCallStack = getCallStack, null otherwise.
+function getProgramType( tCallStack in varchar2, tDepth in number default null ) return varchar2;
+
+-- Returns a name of a requested innermost subprogram.
+-- Example: package "outer" contains procedure "inner" which contains function "inner_function".
+-- getCallStack and subsequent getSubprogram are called inside the function.
+-- "inner_function" would be returned (without double quotes).
+-- If getCallStack and getSubprogram are called inside package body then empty string is returned.
+-- The name returned never contains double quotes.
+-- tCallStack: information returned by getCallStack if tDepth is set or information returned by getCallStackLine.
+-- tDepth: number of requested line if tCallStack = getCallStack, null otherwise.
+-- See: utl_call_stack.subprogram
+function getSubprogram( tCallStack in varchar2, tDepth in number default null ) return varchar2;
+
+-- Returns a type of requested innermost subprogram.
+-- See example in getSubprogram describing the concept of innermost subprogram.
+-- Value returned is one of PROCEDURE or FUNCTION.
+-- tCallStack: information returned by getCallStack if tDepth is set or information returned by getCallStackLine.
+-- tDepth: number of requested line if tCallStack = getCallStack, null otherwise.
+function getSubprogramType( tCallStack in varchar2, tDepth in number default null ) return varchar2;
+
+-- Returns the hierarchy of names separated by dot from outermost to innermost program unit.
+-- Example: package "outer" contains procedure "inner" which contains function "inner_function".
+-- getCallStack and subsequent getSubprogram are called inside the function.
+-- "outer.inner.inner_function" would be returned (without double quotes).
+-- If one of program units in this hierarchy has double quotes in its name, they would be preserved.
+-- tCallStack: information returned by getCallStack if tDepth is set or information returned by getCallStackLine.
+-- tDepth: number of requested line if tCallStack = getCallStack, null otherwise.
+-- See: utl_call_stack.concatenate_subprogram
+function getConcatenatedSubprograms( tCallStack in varchar2, tDepth in number default null ) return varchar2;
+
+end;
+/
+create or replace package body p_stack is
+
+CHAR_BACKSPACE constant char := chr( 8 );
+CHAR_TAB constant char := chr( 9 );
+CHAR_NEW_LINE constant char := chr( 10 );
+CHAR_CARRIAGE_RETURN constant char := chr( 13 );
+UNKNOWN_OWNER constant varchar2( 4 ) := 'NULL';
+PACKAGE_NAME constant varchar2( 7 ) := 'P_STACK';
+
+cursor getSource( tOwner in varchar2, tName in varchar2, tType in varchar2, tLine in number ) is
+  select TEXT, LINE
+  from ALL_SOURCE
+  where OWNER = tOwner
+    and NAME = tName
+    and TYPE = tType
+    and LINE <= tLine
+  order by LINE;
+
+-- Returns a call stack. The call of this procedure is included and is at the first line.
+-- tDepth: which line of stack to show. Lesser numbers are most recent calls. Numeration starts from 1.
+-- The call of this procedure has depth = 1.
+-- If tDepth is null then the whole stack is returned as a string where lines are delimited by "new line" symbol.
+-- Output format: LINE || ': ' || OWNER || '.' || PROGRAM TYPE || [ ' ' || PROGRAM NAME ]? || [ '.' || SUBPROGRAM TYPE || ' ' || SUBPROGRAM NAME ]*
+-- LINE is a source code line number as returned by dbms_utility.format_call_stack.
+-- OWNER is an owner of program unit being called, or parsing schema name for anonymous blocks.
+-- If the parsing schema name could not be retrieved then OWNER equals to current schema name.
+-- PROGRAM TYPE is one of ANONYMOUS BLOCK, PACKAGE, PACKAGE BODY, TYPE BODY, TRIGGER, PROCEDURE, FUNCTION.
+-- It's the type of outermost program unit.
+-- PROGRAM NAME is the name of program unit being called as returned by dbms_utility.format_call_stack.
+-- It's absent for anonymous blocks.
+-- It's double quoted if the source code contains its name in double quotes.
+-- SUBPROGRAM TYPE is one of PROCEDURE or FUNCTION.
+-- It's the type of inner subprogram.
+-- SUBPROGRAM NAME is the name of inner subprogram.
+-- If there are several inner units then all of them are separated by dots.
+function getCallStack( tDepth in number default null ) return varchar2 is
+  tCallPositions varchar2( 4000 );
+  tCallPositionsLine varchar2( 255 );
+  tReached pls_integer;
+  tHandle varchar2( 16 );
+  tHashValue number;
+  tOwnerId number;
+  tOwner varchar2( 255 );
+  tName varchar2( 255 );
+  tLine number;
+  tCurrentLine number;
+  tType varchar2( 255 );
+  tAnonymousBlock pls_integer;
+  tSqlFullText clob;
+  s varchar2( 4000 );
+  t varchar2( 4000 );
+  c char;
+  pos pls_integer;
+  len pls_integer;
+  tCommented pls_integer;
+  tIdentifier pls_integer;
+  tIdentifierName varchar2( 30 );
+  tIdentifiers dbms_sql.varchar2_table;
+  tMaxIdentifier pls_integer;
+  tQuoteDelimiter char;
+  tString pls_integer;
+  tToken varchar2( 4000 );
+  tTokenType pls_integer;
+  tPreviousTokenType pls_integer;
+  tTokensQueue str_table;
+  tCallStack str_table;
+  tLast pls_integer;
+  tLookForDefinition pls_integer;
+  tPrevToken varchar2( 4000 );
+  tPrevPrevToken varchar2( 4000 );
+  tCallStackLine varchar2( 4000 );
+  ret varchar2( 4000 );
+begin
+  tCallPositions := dbms_utility.format_call_stack;
+  tReached := 0;
+  loop
+    pos := instr( tCallPositions, CHAR_NEW_LINE );
+    exit when pos is null or pos = 0;
+    tCallPositionsLine := substr( tCallPositions, 1, pos - 1 );
+    tCallPositions := substr( tCallPositions, pos + 1 );
+    if tReached = 0 or tDepth != tReached then
+      goto NEXT_CALL_POSITION;
+    end if;
+    pos := instr( tCallPositionsLine, ' ' );
+    if pos > 0 then
+      tHandle := substr( tCallPositionsLine, 1, pos - 1 );
+      tCallPositionsLine := ltrim( substr( tCallPositionsLine, pos ) );
+    else
+      tHandle := '';
+    end if;
+    pos := instr( tCallPositionsLine, ' ' );
+    if pos > 0 then
+      tLine := to_number( substr( tCallPositionsLine, 1, pos - 1 ) );
+      tCallPositionsLine := ltrim( substr( tCallPositionsLine, pos ) );
+    else
+      tLine := null;
+    end if;
+    tType := case substr( tCallPositionsLine, 1, 3 )
+               when 'pro' then 'PROCEDURE'
+               when 'fun' then 'FUNCTION'
+               when 'tri' then 'TRIGGER'
+               when 'typ' then 'TYPE BODY'
+               when 'pac' then case when tCallPositionsLine like 'package body%' then 'PACKAGE BODY' else 'PACKAGE' end
+               else 'ANONYMOUS BLOCK'
+             end;
+    tAnonymousBlock := case when tType = 'ANONYMOUS BLOCK' then 1 else 0 end;
+    tCallPositionsLine := substr( tCallPositionsLine, length( tType ) + 2 );
+    pos := instr( tCallPositionsLine, '.' );
+    if pos > 0 then
+      tOwner := substr( tCallPositionsLine, 1, pos - 1 );
+      tName := substr( tCallPositionsLine, pos + 1 );
+    else
+      tOwner := '';
+      tName := '';
+    end if;
+    tCommented := 0;
+    tIdentifier := 0;
+    tString := 0;
+    tMaxIdentifier := 0;
+    tQuoteDelimiter := null;
+    tLookForDefinition := 0;
+    tIdentifiers.delete;
+    tTokensQueue := str_table( '', '', '' );
+    if tAnonymousBlock = 0 then
+      if getSource%isopen then
+        close getSource;
+      end if;
+      open getSource( tOwner, tName, tType, tLine );
+      tCallStack := str_table( '' );
+    else
+      if tHandle is null then
+        tSqlFullText := null;
+      else
+        begin
+          select ADDRESS, HASH_VALUE
+          into tHandle, tHashValue
+          from V$SQL
+          where CHILD_ADDRESS = tHandle;
+          execute immediate
+           'select replace( replace( XMLAgg( XMLElement( "e", SQL_TEXT ) order by PIECE ).getClobVal(), ''</e>'' ), ''<e>'' ) as SQL_FULL_TEXT
+            from V$SQLTEXT_WITH_NEWLINES
+            where ADDRESS = :tHandle
+              and HASH_VALUE = :tHashValue'
+          into tSqlFullText
+          using tHandle, tHashValue;
+        exception
+          when NO_DATA_FOUND then
+            tSqlFullText := null;
+            tHandle := '';
+        end;
+      end if;
+      tCurrentLine := 0;
+      tCallStack := str_table( '', 'ANON' );
+      if tHandle is not null then
+        begin
+          select PARSING_SCHEMA_ID
+          into tOwnerId
+          from V$SQLAREA
+          where ADDRESS = tHandle
+            and HASH_VALUE = tHashValue;
+          select USERNAME
+          into tOwner
+          from ALL_USERS
+          where USER_ID = tOwnerId;
+        exception
+          when NO_DATA_FOUND then
+            null;
+        end;
+      end if;
+    end if;
+    loop
+      if tAnonymousBlock = 0 then
+        fetch getSource into s, tCurrentLine;
+        exit when getSource%notfound;
+      else
+        exit when tCurrentLine = tLine;
+        pos := instr( tSqlFullText, CHAR_NEW_LINE );
+        if pos > 0 then
+          s := substr( tSqlFullText, 1, pos - 1 );
+          tSqlFullText := substr( tSqlFullText, pos + 1 );
+        elsif pos = 0 then
+          s := tSqlFullText;
+          tSqlFullText := null;
+        else
+          exit;
+        end if;
+        tCurrentLine := tCurrentLine + 1;
+      end if;
+      t := '';
+      len := length( s );
+      if len is null then
+        goto NEXT_LINE;
+      end if;
+      pos := 1;
+      loop
+        c := substr( s, pos, 1 );
+        if tCommented = 1 then
+          case c
+            when '*' then
+              if substr( s, pos + 1, 1 ) = '/' then
+                pos := pos + 1;
+                tCommented := 0;
+              end if;
+            else
+              null;
+          end case;
+          goto NEXT_CHAR;
+        end if;
+        if tIdentifier = 1 then
+          case c
+            when '"' then
+              tIdentifier := 0;
+              tMaxIdentifier := tMaxIdentifier + 1;
+              while upper( s ) like '%ID' || tMaxIdentifier || '%' loop
+                tMaxIdentifier := tMaxIdentifier + 1;
+              end loop;
+              tIdentifiers( tMaxIdentifier ) := tIdentifierName;
+              t := t || 'ID' || tMaxIdentifier || ' ';
+              tIdentifierName := '';
+            else
+              tIdentifierName := tIdentifierName || c;
+          end case;
+          goto NEXT_CHAR;
+        end if;
+        if tString = 1 then
+          if tQuoteDelimiter is null then
+            if c = '''' then
+              if substr( s, pos + 1, 1 ) = '''' then
+                pos := pos + 1;
+              else
+                tString := 0;
+              end if;
+            end if;
+          elsif c = tQuoteDelimiter then
+            if substr( s, pos + 1, 1 ) = '''' then
+              tString := 0;
+              tQuoteDelimiter := null;
+              pos := pos + 1;
+            end if;
+          end if;
+          goto NEXT_CHAR;
+        end if;
+        c := upper( c );
+        case c
+          when '/' then
+            if substr( s, pos + 1, 1 ) = '*' then
+              pos := pos + 1;
+              tCommented := 1;
+              c := ' ';
+            end if;
+          when '-' then
+            if substr( s, pos + 1, 1 ) = '-' then
+              goto NEXT_LINE;
+            end if;
+          when '"' then
+            tIdentifier := 1;
+            c := ' ';
+          when 'N' then
+            case upper( substr( s, pos + 1, 1 ) )
+              when 'Q' then
+                if substr( s, pos + 2, 1 ) = '''' then
+                  tQuoteDelimiter := substr( s, pos + 3, 1 );
+                  tQuoteDelimiter := case tQuoteDelimiter when '(' then ')' when '[' then ']' when '<' then '>' when '{' then '}' else tQuoteDelimiter end;
+                  tString := 1;
+                  pos := pos + 3;
+                  t := t || ' STRING ';
+                  goto NEXT_CHAR;
+                end if;
+              when '''' then
+                tString := 1;
+                pos := pos + 1;
+                t := t || ' STRING ';
+                goto NEXT_CHAR;
+              else
+                null;
+            end case;
+          when 'Q' then
+            if substr( s, pos + 1, 1 ) = '''' then
+              tQuoteDelimiter := substr( s, pos + 2, 1 );
+              tQuoteDelimiter := case tQuoteDelimiter when '(' then ')' when '[' then ']' when '<' then '>' when '{' then '}' else tQuoteDelimiter end;
+              tString := 1;
+              pos := pos + 2;
+              t := t || ' STRING ';
+              goto NEXT_CHAR;
+            end if;
+          when '''' then
+            tString := 1;
+            t := t || ' STRING ';
+            goto NEXT_CHAR;
+          else
+            null;
+        end case;
+        t := t || c;
+        <<NEXT_CHAR>>
+        pos := pos + 1;
+        exit when pos > len;
+      end loop;
+      <<NEXT_LINE>>
+      s := t;
+      len := length( s );
+      if len is not null then
+        tToken := '';
+        pos := 1;
+        tPreviousTokenType := 3;
+        loop
+          if pos > len then
+            tTokenType := 3;
+          else
+            c := substr( s, pos, 1 );
+            tTokenType := case
+                            when c = '$'
+                              or c = '_'
+                              or c = '#'
+                              or c between '0' and '9'
+                              or c between 'A' and 'Z'
+                            then 1
+                            when c = ';'
+                            then 2
+                            when c = ' '
+                              or c = CHAR_BACKSPACE
+                              or c = CHAR_TAB
+                              or c = CHAR_NEW_LINE
+                              or c = CHAR_CARRIAGE_RETURN
+                            then 3
+                            else 4
+                          end;
+          end if;
+          if tTokenType != tPreviousTokenType then
+            if tPreviousTokenType != 3 then
+              tTokensQueue.delete( tTokensQueue.first );
+              tTokensQueue.extend;
+              tLast := tTokensQueue.last;
+              tTokensQueue( tLast ) := tToken;
+              exit when tCurrentLine = tLine and tToken = PACKAGE_NAME;
+              tPrevToken := tTokensQueue( tLast - 1 );
+              tPrevPrevToken := tTokensQueue( tLast - 2 );
+              if tToken = 'CASE' then
+                if tPrevToken in ( '>>', ';', 'BEGIN', 'LOOP' )
+                  or tPrevToken in ( 'ELSE', 'THEN' ) and tCallStack( tCallStack.count ) in ( 'IF', 'CASEBLOCK' ) then
+                  tCallStack.extend;
+                  tCallStack( tCallStack.count ) := 'CASEBLOCK';
+                elsif tPrevToken is null or tPrevToken != 'END' then
+                  tCallStack.extend;
+                  tCallStack( tCallStack.count ) := 'CASEEXPR';
+                end if;
+              elsif tToken = 'LOOP' then
+                if tPrevToken is null or tPrevToken != 'END' then
+                  tCallStack.extend;
+                  tCallStack( tCallStack.count ) := 'LOOP';
+                end if;
+              elsif tToken = 'IF' then
+                if tPrevToken in ( '>>', 'THEN', 'ELSE', ';', 'BEGIN', 'LOOP' ) then
+                  tCallStack.extend;
+                  tCallStack( tCallStack.count ) := 'IF';
+                end if;
+              elsif tToken = 'BEGIN' then
+                if tPrevToken in ( '>>', 'THEN', 'ELSE', ';', 'IS', 'AS', 'BEGIN', 'LOOP' ) then
+                  if tCallStack( tCallStack.count ) like '-%' then
+                    tCallStack( tCallStack.count ) := '+' || substr( tCallStack( tCallStack.count ), 2 );
+                  else
+                    tCallStack.extend;
+                    tCallStack( tCallStack.count ) := 'BEGIN';
+                  end if;
+                end if;
+              elsif tToken = ';' then
+                if tLookForDefinition = 1 then
+                  tCallStack.trim;
+                  tLookForDefinition := 0;
+                elsif tPrevPrevToken = 'END' and tPrevToken in ( 'IF', 'LOOP', 'CASE' ) then
+                  case tPrevToken
+                    when 'IF' then
+                      if tCallStack( tCallStack.count ) = 'IF' then
+                        tCallStack.trim;
+                      end if;
+                    when 'LOOP' then
+                      if tCallStack( tCallStack.count ) = 'LOOP' then
+                        tCallStack.trim;
+                      end if;
+                    else
+                      if tCallStack( tCallStack.count ) = 'CASEBLOCK' then
+                        tCallStack.trim;
+                      end if;
+                  end case;
+                elsif tPrevPrevToken = 'END' or tPrevToken = 'END' then
+                  if tCallStack( tCallStack.count ) like '+%' then
+                    tCallStack.trim;
+                  elsif tPrevToken = 'END' then
+                    if tCallStack( tCallStack.count ) = 'BEGIN' then
+                      tCallStack.trim;
+                    end if;
+                  end if;
+                end if;
+              elsif tToken in ( 'IS', 'AS' ) then
+                if tLookForDefinition = 1 then
+                  tLookForDefinition := 0;
+                end if;
+              elsif tToken = 'END' then
+                if tCallStack( tCallStack.count ) = 'CASEEXPR' then
+                  tCallStack.trim;
+                end if;
+              elsif tPrevToken in ( 'TRIGGER', 'FUNCTION', 'PROCEDURE' )
+                or tPrevToken = 'PACKAGE' and tToken != 'BODY'
+                or tPrevToken = 'BODY' and tPrevPrevToken in ( 'PACKAGE', 'TYPE' ) then
+                if tPrevToken in ( 'FUNCTION', 'PROCEDURE' ) then
+                  tLookForDefinition := 1;
+                end if;
+                tCallStack.extend;
+                tCallStack( tCallStack.count ) := case
+                                                    when tPrevToken = 'TRIGGER' then '-TRI'
+                                                    when tPrevToken = 'FUNCTION' then '-FUN'
+                                                    when tPrevToken = 'PROCEDURE' then '-PRO'
+                                                    when tPrevToken = 'PACKAGE' then '-PAC'
+                                                    when tPrevPrevToken = 'PACKAGE' then '-PCB'
+                                                    else '-TYP'
+                                                  end || tToken;
+              end if;
+            end if;
+            tToken := '';
+          end if;
+          tToken := tToken || c;
+          tPreviousTokenType := tTokenType;
+          <<NEXT_TOKEN_CHAR>>
+          pos := pos + 1;
+          exit when pos > len + 1;
+        end loop;
+      end if;
+    end loop;
+    if tAnonymousBlock = 0 then
+      close getSource;
+    end if;
+    tCallStackLine := '';
+    for i in 2 .. tCallStack.count loop
+      tToken := case substr( tCallStack( i ), 2, 3 )
+                  when 'TRI' then 'TRIGGER '
+                  when 'FUN' then 'FUNCTION '
+                  when 'PRO' then 'PROCEDURE '
+                  when 'PAC' then 'PACKAGE '
+                  when 'PCB' then 'PACKAGE BODY '
+                  when 'TYP' then 'TYPE BODY '
+                  when 'NON' then 'ANONYMOUS BLOCK'
+                end;
+      if tToken is not null then
+        if tCallStackLine is not null then
+          tCallStackLine := tCallStackLine || '.';
+        end if;
+        tCallStackLine := tCallStackLine || tToken;
+        tToken := substr( tCallStack( i ), 5 );
+        if tToken like 'ID%' and tIdentifiers.exists( to_number( substr( tToken, 3 ) ) ) then
+          tToken := '"' || tIdentifiers( to_number( substr( tToken, 3 ) ) ) || '"';
+        end if;
+        tCallStackLine := tCallStackLine || tToken;
+      end if;
+    end loop;
+    if ret is not null then
+      ret := ret || CHAR_NEW_LINE;
+    end if;
+    if tOwner is null then
+      tOwner := user; -- UNKNOWN_OWNER;
+    end if;
+    ret := ret || tLine || ': ' || tOwner || '.' || tCallStackLine;
+    exit when tDepth = tReached;
+    <<NEXT_CALL_POSITION>>
+    if tReached = 0 then
+      if tCallPositionsLine like '%handle%number%name%' then
+        tReached := 1;
+      end if;
+    else
+      tReached := tReached + 1;
+    end if;
+  end loop;
+  return ret;
+end;
+
+-- Returns the stack information of a current program unit.
+-- See output format description of function getCallStack.
+function whoAmI return varchar2 is
+begin
+  return getCallStack( 3 );
+end;
+
+-- Returns the stack information of a program unit which has called currently executing code.
+-- See output format description of function getCallStack.
+function whoCalledMe return varchar2 is
+begin
+  return getCallStack( 4 );
+end;
+
+-- Returns one stack line at a given depth.
+-- See output format description of function getCallStack.
+-- tCallStack: information returned by getCallStack.
+-- tDepth: number of requested line.
+function getCallStackLine( tCallStack in varchar2, tDepth in number ) return varchar2 is
+  pos pls_integer;
+  depth pls_integer;
+  tCallLine varchar2( 4000 ) := tCallStack;
+begin
+  if tDepth is null or tDepth <= 0 or tDepth > 4000 then
+    return '';
+  end if;
+  depth := 1;
+  loop
+    pos := instr( tCallLine, CHAR_NEW_LINE );
+    if pos is null or pos = 0 then
+      return case when tDepth = depth then tCallLine end;
+    elsif tDepth = depth then
+      return substr( tCallLine, 1, pos - 1 );
+    elsif tDepth < depth then
+      return '';
+    else
+      tCallLine := substr( tCallLine, pos + 1 );
+      depth := depth + 1;
+    end if;
+  end loop;
+end;
+
+-- Returns current stack depth including the call of this function.
+-- tCallStack: information returned by getCallStack. Can be omitted.
+-- See: utl_call_stack.dynamic_depth
+function getDynamicDepth( tCallStack in varchar2 default '' ) return number is
+  tCallPositions varchar2( 4000 );
+begin
+  if tCallStack is null then
+    tCallPositions := dbms_utility.format_call_stack;
+    return greatest( nvl( length( tCallPositions ) - length( replace( tCallPositions, CHAR_NEW_LINE ) ) - 3, 0 ), 0 );
+  else
+    return greatest( nvl( length( tCallStack ) - length( replace( tCallStack, CHAR_NEW_LINE ) ) + 1, 0 ), 0 );
+  end if;
+end;
+
+-- Returns a depth of a current program unit.
+-- Stored procedures, functions, packages and their bodies, type bodies, triggers and anonymous blocks have a depth equal to 0.
+-- Inner procedures and functions have depth equal to 1 + depth of parent program unit.
+-- tCallStack: information returned by getCallStack if tDepth is set or information returned by getCallStackLine.
+-- tDepth: number of requested line if tCallStack = getCallStack, null otherwise.
+-- See: utl_call_stack.lexical_depth
+function getLexicalDepth( tCallStack in varchar2, tDepth in number default null ) return number is
+  tCallLine varchar2( 4000 ) := case when tDepth is null then tCallStack else getCallStackLine( tCallStack, tDepth ) end;
+begin
+  if tCallLine like '%"%' then
+    tCallLine := regexp_replace( tCallLine, '"[^"]*"' );
+  end if;
+  return greatest( nvl( length( tCallLine ) - length( replace( tCallLine, '.' ) ) - 1, 0 ), 0 );
+end;
+
+-- Returns a source line number as returned by dbms_utility.format_call_stack.
+-- tCallStack: information returned by getCallStack if tDepth is set or information returned by getCallStackLine.
+-- tDepth: number of requested line if tCallStack = getCallStack, null otherwise.
+-- See: utl_call_stack.unit_line
+function getUnitLine( tCallStack in varchar2, tDepth in number default null ) return number is
+  tCallLine varchar2( 4000 ) := case when tDepth is null then tCallStack else getCallStackLine( tCallStack, tDepth ) end;
+  pos pls_integer;
+begin
+  pos := instr( tCallLine, ':' );
+  if pos is null or pos = 0 then
+    return null;
+  end if;
+  return to_number( substr( tCallLine, 1, pos - 1 ) );
+end;
+
+-- Returns owner of a requested program unit, or a parsing schema for an anonymous block.
+-- If the parsing schema name could not be retrieved then OWNER equals to current schema name.
+-- tCallStack: information returned by getCallStack if tDepth is set or information returned by getCallStackLine.
+-- tDepth: number of requested line if tCallStack = getCallStack, null otherwise.
+-- See: utl_call_stack.owner
+function getOwner( tCallStack in varchar2, tDepth in number default null ) return varchar2 is
+  tCallLine varchar2( 4000 ) := case when tDepth is null then tCallStack else getCallStackLine( tCallStack, tDepth ) end;
+  pos pls_integer;
+begin
+  pos := instr( tCallLine, ':' );
+  if pos > 0 then
+    tCallLine := substr( tCallLine, pos + 2 );
+  end if;
+  pos := instr( tCallLine, '.' );
+  if pos > 0 then
+    return nullif( substr( tCallLine, 1, pos - 1 ), UNKNOWN_OWNER );
+  end if;
+  return '';
+end;
+
+-- Returns name of a requested stored procedure. Empty string for anonymous block.
+-- The name returned won't contain double quotes.
+-- tCallStack: information returned by getCallStack if tDepth is set or information returned by getCallStackLine.
+-- tDepth: number of requested line if tCallStack = getCallStack, null otherwise.
+function getProgram( tCallStack in varchar2, tDepth in number default null ) return varchar2 is
+  tCallLine varchar2( 4000 ) := case when tDepth is null then tCallStack else getCallStackLine( tCallStack, tDepth ) end;
+  pos pls_integer;
+  posTo pls_integer;
+begin
+  pos := instr( tCallLine, '.' );
+  if pos > 0 then
+    tCallLine := substr( tCallLine, pos + 1 );
+  end if;
+  posTo := nvl( instr( tCallLine, '.' ), 0 );
+  pos := nvl( instr( tCallLine, '"' ), 0 );
+  if posTo > pos and pos > 0 then
+    posTo := nvl( instr( tCallLine, '"', pos + 1 ), posTo );
+  elsif tCallLine like 'ANON%' then
+    pos := length( 'ANONYMOUS BLOCK' );
+  elsif tCallLine like 'PROC%' then
+    pos := length( 'PROCEDURE ' );
+  elsif tCallLine like 'FUNC%' then
+    pos := length( 'FUNCTION ' );
+  elsif tCallLine like 'TRIG%' then
+    pos := length( 'TRIGGER ' );
+  elsif tCallLine like 'TYPE%' then
+    pos := length( 'TYPE BODY ' );
+  elsif tCallLine like 'PACKAGE B%' then
+    pos := length( 'PACKAGE BODY ' );
+  else
+    pos := length( 'PACKAGE ' );
+  end if;
+  return substr( tCallLine, pos + 1, posTo - pos - 1 );
+end;
+
+-- Returns a type of a requested stored procedure. One of:
+-- ANONYMOUS BLOCK, PROCEDURE, FUNCTION, TRIGGER, PACKAGE, PACKAGE BODY, TYPE BODY.
+-- tCallStack: information returned by getCallStack if tDepth is set or information returned by getCallStackLine.
+-- tDepth: number of requested line if tCallStack = getCallStack, null otherwise.
+function getProgramType( tCallStack in varchar2, tDepth in number default null ) return varchar2 is
+  tCallLine varchar2( 4000 ) := case when tDepth is null then tCallStack else getCallStackLine( tCallStack, tDepth ) end;
+  pos pls_integer;
+begin
+  pos := instr( tCallLine, '.' );
+  if pos > 0 then
+    tCallLine := substr( tCallLine, pos + 1 );
+  end if;
+  if tCallLine like 'ANON%' then
+    return 'ANONYMOUS BLOCK';
+  elsif tCallLine like 'PROC%' then
+    return 'PROCEDURE';
+  elsif tCallLine like 'FUNC%' then
+    return 'FUNCTION';
+  elsif tCallLine like 'TRIG%' then
+    return 'TRIGGER';
+  elsif tCallLine like 'TYPE%' then
+    return 'TYPE BODY';
+  elsif tCallLine like 'PACKAGE B%' then
+    return 'PACKAGE BODY';
+  else
+    return 'PACKAGE';
+  end if;
+end;
+
+-- Returns a name of a requested innermost subprogram.
+-- Example: package "outer" contains procedure "inner" which contains function "inner_function".
+-- getCallStack and subsequent getSubprogram are called inside the function.
+-- "inner_function" would be returned (without double quotes).
+-- If getCallStack and getSubprogram are called inside package body then empty string is returned.
+-- The name returned never contains double quotes.
+-- tCallStack: information returned by getCallStack if tDepth is set or information returned by getCallStackLine.
+-- tDepth: number of requested line if tCallStack = getCallStack, null otherwise.
+-- See: utl_call_stack.subprogram
+function getSubprogram( tCallStack in varchar2, tDepth in number default null ) return varchar2 is
+  tCallLine varchar2( 4000 ) := case when tDepth is null then tCallStack else getCallStackLine( tCallStack, tDepth ) end;
+  pos pls_integer;
+begin
+  if getLexicalDepth( tCallLine ) = 0 then
+    return '';
+  end if;
+  if tCallLine like '%"' then
+    pos := instr( tCallLine, '"', -2 );
+    return substr( tCallLine, pos + 1, length( tCallLine ) - pos - 1 );
+  elsif tCallLine like '%.ANONYMOUS BLOCK' then
+    return '';
+  else
+    pos := instr( tCallLine, ' ', -1 );
+    return substr( tCallLine, pos + 1 );
+  end if;
+end;
+
+-- Returns a type of requested innermost subprogram.
+-- See example in getSubprogram describing the concept of innermost subprogram.
+-- Value returned is one of PROCEDURE or FUNCTION.
+-- tCallStack: information returned by getCallStack if tDepth is set or information returned by getCallStackLine.
+-- tDepth: number of requested line if tCallStack = getCallStack, null otherwise.
+function getSubprogramType( tCallStack in varchar2, tDepth in number default null ) return varchar2 is
+  tCallLine varchar2( 4000 ) := case when tDepth is null then tCallStack else getCallStackLine( tCallStack, tDepth ) end;
+  pos pls_integer;
+begin
+  if tCallLine like '%"' then
+    pos := instr( tCallLine, '"', -2 ) - 2;
+  elsif tCallLine like '%.ANONYMOUS BLOCK' then
+    pos := length( tCallLine );
+  else
+    pos := instr( tCallLine, ' ', -1 ) - 1;
+  end if;
+  tCallLine := substr( tCallLine, 1, pos );
+  pos := instr( tCallLine, '.', -1 );
+  return substr( tCallLine, pos + 1 );
+end;
+
+-- Returns the hierarchy of names separated by dot from outermost to innermost program unit.
+-- Example: package "outer" contains procedure "inner" which contains function "inner_function".
+-- getCallStack and subsequent getSubprogram are called inside the function.
+-- "outer.inner.inner_function" would be returned (without double quotes).
+-- If one of program units in this hierarchy has double quotes in its name, they would be preserved.
+-- tCallStack: information returned by getCallStack if tDepth is set or information returned by getCallStackLine.
+-- tDepth: number of requested line if tCallStack = getCallStack, null otherwise.
+-- See: utl_call_stack.concatenate_subprogram
+function getConcatenatedSubprograms( tCallStack in varchar2, tDepth in number default null ) return varchar2 is
+  tCallLine varchar2( 4000 ) := case when tDepth is null then tCallStack else getCallStackLine( tCallStack, tDepth ) end;
+  pos pls_integer;
+begin
+  pos := instr( tCallLine, '.' );
+  tCallLine := substr( tCallLine, pos );
+  tCallLine := replace( tCallLine, '.PACKAGE BODY ', '.' );
+  tCallLine := replace( tCallLine, '.PACKAGE ', '.' );
+  tCallLine := replace( tCallLine, '.TYPE BODY ', '.' );
+  tCallLine := replace( tCallLine, '.TRIGGER ', '.' );
+  tCallLine := replace( tCallLine, '.PROCEDURE ', '.' );
+  tCallLine := replace( tCallLine, '.FUNCTION ', '.' );
+  return substr( tCallLine, 2 );
+end;
+
+end;
+/
