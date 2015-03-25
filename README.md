@@ -5,6 +5,8 @@ Written and tested for Oracle 10.2 (should work for later versions, some parts m
 Contents:
 
 1. [p_admin](#p_admin)
+  1. [killSession](#killSession)
+  2. [killAllSessions](#killAllSessions)
 2. [p_utils](#p_utils)
 3. [p_stack](#p_stack)
 4. [String aggregation](#string-aggregation)
@@ -19,7 +21,7 @@ If jobs are intensively running all the time, it's hard to compile source code u
 So we need to stop jobs before this process. But inner database methods (such as "alter system kill session" or marking job as broken) may take too long while waiting for resources to be disposed or waiting for the job to be finished. A detailed description of various methods of killing sessions can be found [here][killing sessions]. This package offers methods for immediate jobs and sessions termination. Usually this task is performed by DBAs, not by developers. But sometimes it may ease the process of frequent compilations for both DBAs and developers (by giving more privileges for latter ones), e.g. on test databases.
 [killing sessions]:http://oracle-base.com/articles/misc/killing-oracle-sessions.php
 ___
-<a name="killSession">a</a>
+<a name="killSession"></a>
 ```pl-sql
 procedure killSession( tSid in number );
 ```
@@ -28,6 +30,7 @@ The call is performed via Java stored procedure (see runCommand.sql), which sour
 Only current schema sessions killing is allowed (you can modify the source code to avoid this restriction).
 [shell commands]:http://oracle-base.com/articles/8i/shell-commands-from-plsql.php
 ___
+<a name="killAllSessions"></a>
 ```pl-sql
 procedure killAllSessions;
 ```
@@ -232,6 +235,16 @@ ___
 **Installation notes:**
 
 Compile types.sql and fraction.sql, then p_utils.sql. Java rights are needed only for "calculate" function.
+___
+#p_stack
+A package for call stack control.
+
+There do exist [predefined inquiry directives][predefined inquiry directives] `$$PLSQL_LINE` and `$$PLSQL_UNIT` which allow to get information about current stored program unit and source code line in it.
+[predefined inquiry directives]:http://docs.oracle.com/cd/B19306_01/appdev.102/b14261/fundamentals.htm#BEIBIDCE
+___
+**Installation notes:**
+
+Compile types.sql. Then compile p_stack.sql for Oracle 10 and 11, or p_stack.9.sql for Oracle 9. If the `owa` package is not available, replace its usages by commented `chr` functions. If the views `V$SQL`, `V$SQLAREA` or `V$SQLTEXT_WITH_NEWLINES` are not available, just remove those blocks.
 ___
 #String aggregation
 String aggregation techniques are described in details [here][string aggregation].
