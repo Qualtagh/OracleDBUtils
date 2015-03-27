@@ -1,4 +1,4 @@
-create or replace package p_stack is
+create or replace package p_stack authid current_user is
 
 -- Returns a call stack. The call of this procedure is included and is at the first line.
 -- tDepth: which line of stack to show. Lesser numbers are most recent calls. Numeration starts from 1.
@@ -109,6 +109,9 @@ CHAR_NEW_LINE constant char := owa.NL_CHAR; -- chr( 10 );
 CHAR_CARRIAGE_RETURN constant char := chr( 13 );
 UNKNOWN_OWNER constant varchar2( 4 ) := 'NULL';
 PACKAGE_NAME constant varchar2( 7 ) := 'P_STACK';
+SOURCE_CURSOR constant pls_integer := 0;
+SOURCE_CLOB constant pls_integer := 1;
+SOURCE_PREPROCESSOR constant pls_integer := 2;
 
 cursor getSource( tOwner in varchar2, tName in varchar2, tType in varchar2, tLine in number ) is
   select TEXT, LINE
@@ -140,14 +143,14 @@ function getCallStack( tDepth in number default null ) return varchar2 is
   tCallPositions varchar2( 4000 );
   tCallPositionsLine varchar2( 255 );
   tReached pls_integer;
-  tHandle varchar2( 16 );
-  tHashValue number;
+  tHandle raw( 16 );
   tOwner varchar2( 255 );
   tName varchar2( 255 );
   tLine number;
   tCurrentLine number;
   tType varchar2( 255 );
-  tAnonymousBlock pls_integer;
+  tSourceType pls_integer;
+  tPreprocessed dbms_preprocessor.source_lines_t;
   tSqlFullText clob;
   s varchar2( 4000 );
   t varchar2( 4000 );
@@ -185,10 +188,10 @@ begin
     end if;
     pos := instr( tCallPositionsLine, ' ' );
     if pos > 0 then
-      tHandle := substr( tCallPositionsLine, 1, pos - 1 );
+      tHandle := hextoraw( substr( tCallPositionsLine, 1, pos - 1 ) );
       tCallPositionsLine := ltrim( substr( tCallPositionsLine, pos ) );
     else
-      tHandle := '';
+      tHandle := null;
     end if;
     pos := instr( tCallPositionsLine, ' ' );
     if pos > 0 then
@@ -205,7 +208,7 @@ begin
                when 'pac' then case when tCallPositionsLine like 'package body%' then 'PACKAGE BODY' else 'PACKAGE' end
                else 'ANONYMOUS BLOCK'
              end;
-    tAnonymousBlock := case when tType = 'ANONYMOUS BLOCK' then 1 else 0 end;
+    tSourceType := case when tType = 'ANONYMOUS BLOCK' then SOURCE_CLOB else SOURCE_CURSOR end;
     tCallPositionsLine := substr( tCallPositionsLine, length( tType ) + 2 );
     pos := instr( tCallPositionsLine, '.' );
     if pos > 0 then
@@ -223,47 +226,68 @@ begin
     tLookForDefinition := 0;
     tIdentifiers.delete;
     tTokensQueue := str_table( '', '', '' );
-    if tAnonymousBlock = 0 then
-      if getSource%isopen then
-        close getSource;
-      end if;
-      open getSource( tOwner, tName, tType, tLine );
+    if tSourceType = SOURCE_CURSOR then
+      begin
+        select SOURCE_PREPROCESSOR
+        into tSourceType
+        from ALL_SOURCE
+        where OWNER = tOwner
+          and NAME = tName
+          and TYPE = tType
+          and LINE <= tLine
+          and TEXT like '%$%'
+          and rownum = 1;
+        tPreprocessed := dbms_preprocessor.get_post_processed_source( tType, tOwner, tName );
+        tCurrentLine := 0;
+      exception
+        when NO_DATA_FOUND then
+          if getSource%isopen then
+            close getSource;
+          end if;
+          open getSource( tOwner, tName, tType, tLine );
+      end;
       tCallStack := str_table( '' );
     else
       if tHandle is null then
         tSqlFullText := null;
       else
         begin
-          select SQL_FULLTEXT, ADDRESS, HASH_VALUE
-          into tSqlFullText, tHandle, tHashValue
+          select SQL_FULLTEXT, PARSING_SCHEMA_NAME
+          into tSqlFullText, tOwner
           from V$SQL
           where CHILD_ADDRESS = tHandle;
         exception
           when NO_DATA_FOUND then
             tSqlFullText := null;
-            tHandle := '';
         end;
       end if;
       tCurrentLine := 0;
       tCallStack := str_table( '', 'ANON' );
-      if tHandle is not null then
-        begin
-          select PARSING_SCHEMA_NAME
-          into tOwner
-          from V$SQLAREA
-          where ADDRESS = tHandle
-            and HASH_VALUE = tHashValue;
-        exception
-          when NO_DATA_FOUND then
-            null;
-        end;
+      if tSqlFullText like '%$%' then
+        tSourceType := SOURCE_PREPROCESSOR;
+        loop
+          pos := instr( tSqlFullText, CHAR_NEW_LINE );
+          if pos > 0 then
+            s := substr( tSqlFullText, 1, pos );
+            tSqlFullText := substr( tSqlFullText, pos + 1 );
+          elsif pos = 0 then
+            s := tSqlFullText;
+            tSqlFullText := null;
+          else
+            exit;
+          end if;
+          tCurrentLine := tCurrentLine + 1;
+          tPreprocessed( tCurrentLine ) := s;
+        end loop;
+        tCurrentLine := 0;
+        tPreprocessed := dbms_preprocessor.get_post_processed_source( tPreprocessed );
       end if;
     end if;
     loop
-      if tAnonymousBlock = 0 then
+      if tSourceType = SOURCE_CURSOR then
         fetch getSource into s, tCurrentLine;
         exit when getSource%notfound;
-      else
+      elsif tSourceType = SOURCE_CLOB then
         exit when tCurrentLine = tLine;
         pos := instr( tSqlFullText, CHAR_NEW_LINE );
         if pos > 0 then
@@ -276,6 +300,10 @@ begin
           exit;
         end if;
         tCurrentLine := tCurrentLine + 1;
+      else
+        exit when tCurrentLine = tLine;
+        tCurrentLine := tCurrentLine + 1;
+        s := tPreprocessed( tCurrentLine );
       end if;
       t := '';
       len := length( s );
@@ -516,7 +544,7 @@ begin
         end loop;
       end if;
     end loop;
-    if tAnonymousBlock = 0 then
+    if tSourceType = SOURCE_CURSOR then
       close getSource;
     end if;
     tCallStackLine := '';

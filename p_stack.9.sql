@@ -140,7 +140,7 @@ function getCallStack( tDepth in number default null ) return varchar2 is
   tCallPositions varchar2( 4000 );
   tCallPositionsLine varchar2( 255 );
   tReached pls_integer;
-  tHandle varchar2( 16 );
+  tHandle raw( 16 );
   tHashValue number;
   tOwnerId number;
   tOwner varchar2( 255 );
@@ -186,10 +186,10 @@ begin
     end if;
     pos := instr( tCallPositionsLine, ' ' );
     if pos > 0 then
-      tHandle := substr( tCallPositionsLine, 1, pos - 1 );
+      tHandle := hextoraw( substr( tCallPositionsLine, 1, pos - 1 ) );
       tCallPositionsLine := ltrim( substr( tCallPositionsLine, pos ) );
     else
-      tHandle := '';
+      tHandle := null;
     end if;
     pos := instr( tCallPositionsLine, ' ' );
     if pos > 0 then
@@ -235,8 +235,8 @@ begin
         tSqlFullText := null;
       else
         begin
-          select ADDRESS, HASH_VALUE
-          into tHandle, tHashValue
+          select ADDRESS, HASH_VALUE, PARSING_SCHEMA_ID
+          into tHandle, tHashValue, tOwnerId
           from V$SQL
           where CHILD_ADDRESS = tHandle;
           execute immediate
@@ -246,30 +246,22 @@ begin
               and HASH_VALUE = :tHashValue'
           into tSqlFullText
           using tHandle, tHashValue;
+          begin
+            select USERNAME
+            into tOwner
+            from ALL_USERS
+            where USER_ID = tOwnerId;
+          exception
+            when NO_DATA_FOUND then
+              null;
+          end;
         exception
           when NO_DATA_FOUND then
             tSqlFullText := null;
-            tHandle := '';
         end;
       end if;
       tCurrentLine := 0;
       tCallStack := str_table( '', 'ANON' );
-      if tHandle is not null then
-        begin
-          select PARSING_SCHEMA_ID
-          into tOwnerId
-          from V$SQLAREA
-          where ADDRESS = tHandle
-            and HASH_VALUE = tHashValue;
-          select USERNAME
-          into tOwner
-          from ALL_USERS
-          where USER_ID = tOwnerId;
-        exception
-          when NO_DATA_FOUND then
-            null;
-        end;
-      end if;
     end if;
     loop
       if tAnonymousBlock = 0 then
