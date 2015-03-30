@@ -509,13 +509,13 @@ begin
                     end if;
                   end if;
                 end if;
-              elsif tToken in ( 'IS', 'AS' ) then
-                if tLookForDefinition = 1 then
-                  tLookForDefinition := 0;
-                end if;
               elsif tToken = 'END' then
                 if tCallStack( tCallStack.count ) = 'CASEEXPR' then
                   tCallStack.trim;
+                end if;
+              elsif tPrevToken in ( 'IS', 'AS' ) and tToken not in ( 'NOT', 'NULL' ) then
+                if tLookForDefinition = 1 then
+                  tLookForDefinition := 0;
                 end if;
               elsif tPrevToken in ( 'TRIGGER', 'FUNCTION', 'PROCEDURE' )
                 or tPrevToken = 'PACKAGE' and tToken != 'BODY'

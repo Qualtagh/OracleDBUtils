@@ -1,4 +1,4 @@
-create or replace package p_stack is
+create or replace package p_stack authid current_user is
 
 -- Returns a call stack. The call of this procedure is included and is at the first line.
 -- tDepth: which line of stack to show. Lesser numbers are most recent calls. Numeration starts from 1.
@@ -485,13 +485,13 @@ begin
                     end if;
                   end if;
                 end if;
-              elsif tToken in ( 'IS', 'AS' ) then
-                if tLookForDefinition = 1 then
-                  tLookForDefinition := 0;
-                end if;
               elsif tToken = 'END' then
                 if tCallStack( tCallStack.count ) = 'CASEEXPR' then
                   tCallStack.trim;
+                end if;
+              elsif tPrevToken in ( 'IS', 'AS' ) and tToken not in ( 'NOT', 'NULL' ) then
+                if tLookForDefinition = 1 then
+                  tLookForDefinition := 0;
                 end if;
               elsif tPrevToken in ( 'TRIGGER', 'FUNCTION', 'PROCEDURE' )
                 or tPrevToken = 'PACKAGE' and tToken != 'BODY'
