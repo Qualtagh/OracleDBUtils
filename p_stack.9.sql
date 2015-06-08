@@ -485,13 +485,9 @@ begin
                     end if;
                   end if;
                 end if;
-              elsif tToken = 'END' then
+              elsif tPrevToken = 'END' then
                 if tCallStack( tCallStack.count ) = 'CASEEXPR' then
                   tCallStack.trim;
-                end if;
-              elsif tPrevToken in ( 'IS', 'AS' ) and tToken not in ( 'NOT', 'NULL' ) then
-                if tLookForDefinition = 1 then
-                  tLookForDefinition := 0;
                 end if;
               elsif tPrevToken in ( 'TRIGGER', 'FUNCTION', 'PROCEDURE' )
                 or tPrevToken = 'PACKAGE' and tToken != 'BODY'
@@ -508,6 +504,9 @@ begin
                                                     when tPrevPrevToken = 'PACKAGE' then '-PCB'
                                                     else '-TYP'
                                                   end || tToken;
+              end if;
+              if tLookForDefinition = 1 and tPrevToken in ( 'IS', 'AS' ) and tToken not in ( 'NOT', 'NULL' ) then
+                tLookForDefinition := 0;
               end if;
             end if;
             tToken := '';
