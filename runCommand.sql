@@ -26,4 +26,4 @@ public class Command
 /
 create or replace procedure runCommand( tCommand in varchar2 ) is language java name
  'org.quinto.admin.Command.runCommand( java.lang.String )';
- /
+/

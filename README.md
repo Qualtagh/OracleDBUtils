@@ -14,6 +14,8 @@ Contents:
   7. [pauseAllJobs](#pauseAllJobs)
   8. [pauseJob](#pauseJob)
   9. [pauseJobsLike](#pauseJobsLike)
+  10. [getSessionId](#getSessionId)
+  11. [getJobId](#getJobId)
 2. [p_utils](#p_utils)
   1. [numberToChar](#numberToChar)
   2. [getAssociativeArray](#getAssociativeArray)
@@ -54,7 +56,7 @@ procedure killSession( tSid in number );
 ```
 This procedure takes session SID (from view V$SESSION) as argument and kills a corresponding session by calling orakill.exe (on Windows server) or kill -9 (on UNIX machines).
 The call is performed via Java stored procedure (see runCommand.sql), which source code is a modified version of Host class available [here][shell commands].
-Only current schema sessions killing is allowed (you can modify the source code to avoid this restriction).
+Only current schema sessions killing is allowed (you can modify the source code to avoid this restriction). So it's safe to grant execute on this package to any schema. The owner of this package is allowed to kill any schema session (except SYS).
 [shell commands]:http://oracle-base.com/articles/8i/shell-commands-from-plsql.php
 ___
 <a name="killAllSessions"></a>
@@ -140,9 +142,26 @@ pauseJobsLike( 'my_schema.my_package.%' );
 This call will guarantee that all jobs starting from 'my_schema.my_package.' would wait at least 10 minutes before next run.
 The condition is simple: where WHAT like tLikeCondition. So wildcards like '%' and '_' are acceptable.
 ___
+<a name="getSessionId"></a>
+```pl-sql
+function getSessionId return number;
+```
+This method returns SID of a current session. This call is equivalent to sys_context( 'userenv', 'sessionid' ).
+___
+<a name="getJobId"></a>
+```pl-sql
+function getJobId return number;
+```
+This method returns an identifier of the current executing job. This is the field JOB from USER_JOBS.
+___
 **Installation notes:**
 
-First, compile runCommand.sql under sys. Grant appropriate Java right to access files if needed as described [here][shell commands].
+First, compile runCommand.sql under sys. Grant appropriate Java right to access files if needed as described [here][shell commands]. Example for *NIX environment:
+```sql
+begin
+  dbms_java.grant_permission( 'Schema_that_owns_runCommand', 'SYS:java.io.FilePermission', '/bin/sh', 'execute' );
+end;
+```
 It's not recommended to grant rights on runCommand procedure to someone else except sys.
 Then, compile p_admin.sql under sys and grant rights/add synonym to target user scheme.
 The target user may also need an access to V$SESSION view to find SID of hanged session.

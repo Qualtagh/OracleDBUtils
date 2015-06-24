@@ -19,6 +19,10 @@ procedure pauseJob( tJob in number, tMin in number default 1 / 144, tMax in numb
 procedure pauseAllJobs( tMin in number default 1 / 144, tMax in number default null, tIncr in number default null );
 -- Kill jobs selected by a mask and schedule them to launch later.
 procedure pauseJobsLike( tLikeCondition in varchar2, tMin in number default 1 / 144, tMax in number default null, tIncr in number default null, tJob in number default null );
+-- Return current session id (SID).
+function getSessionId return number;
+-- Return current job id (JOB from USER_JOBS), or null if the function is called outside a job.
+function getJobId return number;
 
 end;
 /
@@ -35,7 +39,11 @@ begin
        V$PROCESS p
   where s.SID = tSid
     and s.PADDR = p.ADDR
-    and s.USERNAME = user;
+    -- The caller of this procedure is allowed to kill only his sessions.
+    and ( s.USERNAME = user
+          -- Allow the owner of this procedure (usually some kind of a DBA schema) to kill any session.
+          or s.USERNAME != 'SYS'
+		     and user = sys_context( 'userenv', 'current_schema' ) );
   if dbms_utility.port_string like '%WIN%' then
     select INSTANCE_NAME
     into tInstanceName
@@ -117,7 +125,7 @@ begin
   killSession( tSid );
 exception
   when NO_DATA_FOUND then
-    raise_application_error( -20001, 'Job ' || job || ' is not running' );
+    raise_application_error( -20001, 'Job ' || tJob || ' is not running' );
   when OTHERS then
     raise;
 end;
@@ -181,6 +189,27 @@ begin
     dbms_lock.sleep( 1 );
   end loop;
   commit;
+end;
+
+-- Return current session id (SID).
+function getSessionId return number is
+begin
+  return sys_context( 'userenv', 'sessionid' );
+end;
+
+-- Return current job id (JOB from USER_JOBS), or null if the function is called outside a job.
+function getJobId return number is
+  ret number;
+begin
+  select ID2
+  into ret
+  from V$LOCK
+  where TYPE = 'JQ'
+    and SID = sys_context( 'userenv', 'sessionid' );
+  return ret;
+exception
+  when NO_DATA_FOUND then
+    return null;
 end;
 
 end;
