@@ -157,13 +157,36 @@ ___
 **Installation notes:**
 
 First, compile runCommand.sql under sys. Grant appropriate Java right to access files if needed as described [here][shell commands]. Example for *NIX environment:
-```sql
+```pl-sql
 begin
   dbms_java.grant_permission( 'Schema_that_owns_runCommand', 'SYS:java.io.FilePermission', '/bin/sh', 'execute' );
 end;
 ```
+It may require additional permission which can be set like this:
+```pl-sql
+begin
+  dbms_java.grant_policy_permission( 'Schema_that_owns_runCommand', 'SYS', 'java.io.FilePermission', '*' );
+end;
+```
+Run it under sys or with JAVA_ADMIN role granted. Use the following snippet to remove this policy permission after file execution permission is granted:
+```pl-sql
+declare
+  tSeq number;
+begin
+  select SEQ
+  into tSeq
+  from DBA_JAVA_POLICY
+  where KIND = 'GRANT'
+    and GRANTEE = 'Schema_that_owns_runCommand'
+    and TYPE_SCHEMA = 'SYS'
+    and TYPE_NAME = 'oracle.aurora.rdbms.security.PolicyTablePermission'
+    and NAME = '0:java.io.FilePermission#*';
+  dbms_java.disable_permission( tSeq );
+  dbms_java.delete_permission( tSeq );
+end;
+```
 It's not recommended to grant rights on runCommand procedure to someone else except sys.
-Then, compile p_admin.sql under sys and grant rights/add synonym to target user scheme.
+Then, compile p_admin.sql under sys and grant rights/add synonym to target user schema.
 The target user may also need an access to V$SESSION view to find SID of hanged session.
 ___
 #p_utils
