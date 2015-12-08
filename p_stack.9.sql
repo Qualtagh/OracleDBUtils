@@ -30,7 +30,7 @@ function whoCalledMe return varchar2;
 -- Returns one stack line at a given depth.
 -- See output format description of function getCallStack.
 -- tCallStack: information returned by getCallStack.
--- tDepth: number of requested line.
+-- tDepth: number of requested line. If tDepth is out of bounds then null is returned.
 function getCallStackLine( tCallStack in varchar2, tDepth in number ) return varchar2;
 
 -- Returns current stack depth including the call of this function.
@@ -98,6 +98,30 @@ function getSubprogramType( tCallStack in varchar2, tDepth in number default nul
 -- tDepth: number of requested line if tCallStack = getCallStack, null otherwise.
 -- See: utl_call_stack.concatenate_subprogram
 function getConcatenatedSubprograms( tCallStack in varchar2, tDepth in number default null ) return varchar2;
+
+-- Returns an error stack as a string.
+-- tDepth: number of requested stack line. Lesser numbers are most recent errors. Numeration starts from 1.
+-- If omitted then the full stack is concatenated via newline character.
+-- The full stack output equals to dbms_utility.format_call_stack.
+-- See: dbms_utility.format_call_stack
+function getErrorStack( tDepth in number default null ) return varchar2;
+
+-- Returns current error stack depth.
+-- tErrorStack: information returned by getErrorStack. Can be omitted.
+-- See: utl_call_stack.error_depth
+function getErrorDepth( tErrorStack in varchar2 default '' ) return number;
+
+-- Returns error code at a given depth.
+-- tErrorStack: information returned by getErrorStack.
+-- tDepth: number of requested stack line if tErrorStack = getErrorStack, null otherwise.
+-- See: utl_call_stack.error_number
+function getErrorCode( tErrorStack in varchar2, tDepth in number default null ) return number;
+
+-- Returns error message at a given depth.
+-- tErrorStack: information returned by getErrorStack.
+-- tDepth: number of requested stack line if tErrorStack = getErrorStack, null otherwise.
+-- See: utl_call_stack.error_msg
+function getErrorMessage( tErrorStack in varchar2, tDepth in number default null ) return varchar2;
 
 end;
 /
@@ -582,7 +606,7 @@ end;
 -- Returns one stack line at a given depth.
 -- See output format description of function getCallStack.
 -- tCallStack: information returned by getCallStack.
--- tDepth: number of requested line.
+-- tDepth: number of requested line. If tDepth is out of bounds then null is returned.
 function getCallStackLine( tCallStack in varchar2, tDepth in number ) return varchar2 is
   pos pls_integer;
   depth pls_integer;
@@ -804,6 +828,73 @@ begin
   tCallLine := replace( tCallLine, '.PROCEDURE ', '.' );
   tCallLine := replace( tCallLine, '.FUNCTION ', '.' );
   return substr( tCallLine, 2 );
+end;
+
+-- Returns an error stack as a string.
+-- tDepth: number of requested stack line. Lesser numbers are most recent errors. Numeration starts from 1.
+-- If omitted then the full stack is concatenated via newline character.
+-- If tDepth is out of bounds then null is returned.
+-- The full stack output equals to dbms_utility.format_call_stack.
+-- See: dbms_utility.format_call_stack
+function getErrorStack( tDepth in number default null ) return varchar2 is
+  tErrorStack varchar2( 4000 ) := dbms_utility.format_error_stack;
+begin
+  if tErrorStack is null then
+    tErrorStack := CHAR_NEW_LINE;
+  end if;
+  if tDepth is null then
+    return tErrorStack;
+  else
+    return getCallStackLine( tErrorStack, tDepth ) || CHAR_NEW_LINE;
+  end if;
+end;
+
+-- Returns current error stack depth.
+-- tErrorStack: information returned by getErrorStack. Can be omitted.
+-- See: utl_call_stack.error_depth
+function getErrorDepth( tErrorStack in varchar2 default '' ) return number is
+  nErrorStack varchar2( 4000 );
+begin
+  if tErrorStack is null then
+    nErrorStack := getErrorStack;
+  else
+    nErrorStack := tErrorStack;
+  end if;
+  return greatest( nvl( length( nErrorStack ) - length( replace( nErrorStack, CHAR_NEW_LINE ) ), 0 ), 0 );
+end;
+
+-- Returns error code at a given depth.
+-- tErrorStack: information returned by getErrorStack.
+-- tDepth: number of requested stack line if tErrorStack = getErrorStack, null otherwise.
+-- See: utl_call_stack.error_number
+function getErrorCode( tErrorStack in varchar2, tDepth in number default null ) return number is
+  tErrorLine varchar2( 4000 ) := getCallStackLine( tErrorStack, nvl( tDepth, 1 ) );
+  pos pls_integer;
+begin
+  pos := instr( tErrorLine, ':' );
+  if pos is null or pos = 0 then
+    return null;
+  end if;
+  tErrorLine := substr( tErrorLine, 1, pos - 1 );
+  if tErrorLine like 'ORA-%' then
+    tErrorLine := substr( tErrorLine, 5 );
+  end if;
+  return to_number( tErrorLine );
+end;
+
+-- Returns error message at a given depth.
+-- tErrorStack: information returned by getErrorStack.
+-- tDepth: number of requested stack line if tErrorStack = getErrorStack, null otherwise.
+-- See: utl_call_stack.error_msg
+function getErrorMessage( tErrorStack in varchar2, tDepth in number default null ) return varchar2 is
+  tErrorLine varchar2( 4000 ) := getCallStackLine( tErrorStack, nvl( tDepth, 1 ) );
+  pos pls_integer;
+begin
+  pos := instr( tErrorLine, ':' );
+  if pos is null or pos = 0 then
+    return null;
+  end if;
+  return substr( tErrorLine, pos + 2 );
 end;
 
 end;
