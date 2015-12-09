@@ -144,6 +144,18 @@ function getErrorCode( tErrorStack in varchar2, tDepth in number default null ) 
 -- See: utl_call_stack.error_msg
 function getErrorMessage( tErrorStack in varchar2, tDepth in number default null ) return varchar2;
 
+-- Returns a backtrace stack as a string.
+-- It shows program units and line numbers where the last error has occurred.
+-- The output format is the same as in getCallStack.
+-- See getCallStack documentation to get more information about the output format.
+-- tDepth: number of requested stack line. Lesser numbers are most recent calls. Numeration starts from 1.
+-- The order equals to the order returned by dbms_utility.format_error_backtrace.
+-- Also, the order equals to the order returned by getCallStack.
+-- But it doesn't equal to the order returned by utl_call_stack.backtrace_unit which is reversed.
+-- If tDepth is omitted then the full stack is concatenated via newline character.
+-- See: dbms_utility.format_error_backtrace
+function getBacktraceStack( tDepth in number default null ) return varchar2;
+
 end;
 /
 create or replace package body p_stack is
@@ -167,24 +179,9 @@ cursor getSource( tOwner in varchar2, tName in varchar2, tType in varchar2, tLin
     and LINE <= tLine
   order by LINE;
 
--- Returns a call stack. The call of this procedure is included and is at the first line.
--- tDepth: which line of stack to show. Lesser numbers are most recent calls. Numeration starts from 1.
--- The call of this procedure has depth = 1.
--- If tDepth is null then the whole stack is returned as a string where lines are delimited by "new line" symbol.
--- Output format: LINE || ': ' || OWNER || '.' || PROGRAM TYPE || [ ' ' || PROGRAM NAME ]? || [ '.' || SUBPROGRAM TYPE || ' ' || SUBPROGRAM NAME ]*
--- LINE is a source code line number as returned by dbms_utility.format_call_stack.
--- OWNER is an owner of program unit being called, or parsing schema name for anonymous blocks.
--- If the parsing schema name could not be retrieved then OWNER equals to current schema name.
--- PROGRAM TYPE is one of ANONYMOUS BLOCK, PACKAGE, PACKAGE BODY, TYPE BODY, TRIGGER, PROCEDURE, FUNCTION.
--- It's the type of outermost program unit.
--- PROGRAM NAME is the name of program unit being called as returned by dbms_utility.format_call_stack.
--- It's absent for anonymous blocks.
--- It's double quoted if the source code contains its name in double quotes.
--- SUBPROGRAM TYPE is one of PROCEDURE or FUNCTION.
--- It's the type of inner subprogram.
--- SUBPROGRAM NAME is the name of inner subprogram.
--- If there are several inner units then all of them are separated by dots.
-function getCallStack( tDepth in number default null ) return varchar2 is
+-- A private method for parsing an input in format of dbms_utility.format_call_stack.
+-- Used in getCallStack and getBacktraceStack.
+function getCallStack( tFormatCallStack in varchar2, tDepth in number default null ) return varchar2 is
   tCallPositions varchar2( 4000 );
   tCallPositionsLine varchar2( 255 );
   tReached pls_integer;
@@ -221,7 +218,7 @@ function getCallStack( tDepth in number default null ) return varchar2 is
   tCallStackLine varchar2( 4000 );
   ret varchar2( 4000 );
 begin
-  tCallPositions := dbms_utility.format_call_stack;
+  tCallPositions := tFormatCallStack;
   tReached := 0;
   loop
     pos := instr( tCallPositions, CHAR_NEW_LINE );
@@ -632,6 +629,30 @@ begin
     end if;
   end loop;
   return ret;
+end;
+
+-- Returns a call stack. The call of this procedure is included and is at the first line.
+-- tDepth: which line of stack to show. Lesser numbers are most recent calls. Numeration starts from 1.
+-- The call of this procedure has depth = 1.
+-- If tDepth is null then the whole stack is returned as a string where lines are delimited by "new line" symbol.
+-- Output format: LINE || ': ' || OWNER || '.' || PROGRAM TYPE || [ ' ' || PROGRAM NAME ]? || [ '.' || SUBPROGRAM TYPE || ' ' || SUBPROGRAM NAME ]*
+-- LINE is a source code line number as returned by dbms_utility.format_call_stack.
+-- OWNER is an owner of program unit being called, or parsing schema name for anonymous blocks.
+-- If the parsing schema name could not be retrieved then OWNER equals to current schema name.
+-- PROGRAM TYPE is one of ANONYMOUS BLOCK, PACKAGE, PACKAGE BODY, TYPE BODY, TRIGGER, PROCEDURE, FUNCTION.
+-- It's the type of outermost program unit.
+-- PROGRAM NAME is the name of program unit being called as returned by dbms_utility.format_call_stack.
+-- It's absent for anonymous blocks.
+-- It's double quoted if the source code contains its name in double quotes.
+-- SUBPROGRAM TYPE is one of PROCEDURE or FUNCTION.
+-- It's the type of inner subprogram.
+-- SUBPROGRAM NAME is the name of inner subprogram.
+-- If there are several inner units then all of them are separated by dots.
+function getCallStack( tDepth in number default null ) return varchar2 is
+  ret varchar2( 4000 );
+  pos pls_integer;
+begin
+  return getCallStack( dbms_utility.format_call_stack, tDepth );
 end;
 
 -- Returns the stack information of a current program unit.
@@ -1049,6 +1070,122 @@ begin
     return null;
   end if;
   return substr( tErrorLine, pos + 2 );
+end;
+
+-- Returns CHILD_ADDRESS field of V$SQL view for current executing program.
+-- Private function.
+function getCurrentSqlChildAddress return varchar2 is
+  ret varchar( 4000 ) := dbms_utility.format_call_stack;
+  pos pls_integer;
+begin
+  if ret like '%anonymous block' || CHAR_NEW_LINE then
+    pos := instr( ret, CHAR_NEW_LINE, -2 );
+    if pos > 0 then
+      ret := substr( ret, pos + 1 );
+      pos := instr( ret, ' ' );
+      if pos > 0 then
+        return substr( ret, 1, pos - 1 );
+      end if;
+    end if;
+  end if;
+  return '';
+end;
+
+-- Returns a backtrace stack as a string.
+-- It shows program units and line numbers where the last error has occurred.
+-- The output format is the same as in getCallStack.
+-- See getCallStack documentation to get more information about the output format.
+-- tDepth: number of requested stack line. Lesser numbers are most recent calls. Numeration starts from 1.
+-- The order equals to the order returned by dbms_utility.format_error_backtrace.
+-- Also, the order equals to the order returned by getCallStack.
+-- But it doesn't equal to the order returned by utl_call_stack.backtrace_unit which is reversed.
+-- If tDepth is omitted then the full stack is concatenated via newline character.
+-- See: dbms_utility.format_error_backtrace
+function getBacktraceStack( tDepth in number default null ) return varchar2 is
+  tBacktrace varchar2( 4000 ) := dbms_utility.format_error_backtrace;
+  ret varchar2( 4000 ) :=
+    '----- PL/SQL Call Stack -----' || CHAR_NEW_LINE ||
+    '  object      line  object' || CHAR_NEW_LINE ||
+    '  handle    number  name' || CHAR_NEW_LINE;
+  pos pls_integer;
+  tLineNumber pls_integer;
+  tUnitName varchar2( 4000 );
+  tUnitType varchar2( 255 );
+  tOwner varchar2( 255 );
+  tHandle varchar2( 255 );
+begin
+  loop
+    pos := instr( tBacktrace, 'at ' );
+    if pos > 0 then
+      tBacktrace := substr( tBacktrace, pos + 3 );
+      tUnitName := '';
+      if tBacktrace like '"%' then
+        pos := instr( tBacktrace, '"', 2 );
+        if pos > 0 then
+          tUnitName := substr( tBacktrace, 2, pos - 2 );
+          pos := instr( tBacktrace, 'line ', pos + 1 );
+        else
+          pos := instr( tBacktrace, 'line ', 2 );
+        end if;
+      else
+        pos := instr( tBacktrace, 'line ' );
+      end if;
+      tLineNumber := 0;
+      if pos > 0 then
+        tBacktrace := substr( tBacktrace, pos + 5 );
+        pos := instr( tBacktrace, CHAR_NEW_LINE );
+        begin
+          if pos > 0 then
+            tLineNumber := to_number( substr( tBacktrace, 1, pos - 1 ) );
+          else
+            tLineNumber := to_number( tBacktrace );
+          end if;
+        exception
+          when VALUE_ERROR then
+            null;
+        end;
+      else
+        pos := instr( tBacktrace, CHAR_NEW_LINE );
+      end if;
+      if tUnitName is null then
+        tUnitName := 'anonymous block';
+        tHandle := getCurrentSqlChildAddress;
+      else
+        pos := instr( tUnitName, '.' );
+        if pos > 0 then
+          tOwner := substr( tUnitName, 1, pos - 1 );
+          tUnitName := substr( tUnitName, pos + 1 );
+        else
+          tOwner := user;
+        end if;
+        begin
+          select lower( OBJECT_TYPE ) as OBJECT_TYPE
+          into tUnitType
+          from ALL_OBJECTS
+          where OWNER = tOwner
+            and OBJECT_NAME = tUnitName
+            and OBJECT_TYPE in ( 'FUNCTION', 'PROCEDURE', 'PACKAGE BODY', 'TYPE BODY', 'TRIGGER' );
+        exception
+          when NO_DATA_FOUND then
+            tUnitType := '';
+          when TOO_MANY_ROWS then
+            tUnitType := '';
+        end;
+        tUnitName := tOwner || '.' || tUnitName;
+        if tUnitType is not null then
+          tUnitName := tUnitType || ' ' || tUnitName;
+        end if;
+        tHandle := '00000000';
+      end if;
+      ret := ret || tHandle || lpad( to_char( tLineNumber ), 10 ) || '  ' || tUnitName || CHAR_NEW_LINE;
+      if pos > 0 then
+        tBacktrace := substr( tBacktrace, pos + 1 );
+      end if;
+    else
+      exit;
+    end if;
+  end loop;
+  return getCallStack( ret, tDepth );
 end;
 
 end;
