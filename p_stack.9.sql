@@ -89,6 +89,27 @@ function getSubprogram( tCallStack in varchar2, tDepth in number default null ) 
 -- tDepth: number of requested line if tCallStack = getCallStack, null otherwise.
 function getSubprogramType( tCallStack in varchar2, tDepth in number default null ) return varchar2;
 
+-- Returns a table of names of requested subprograms.
+-- Example: package "outer" contains procedure "inner" which contains function "inner_function".
+-- getCallStack and subsequent getSubprograms are called inside the function.
+-- An array [ "inner", "inner_function" ] would be returned (without double quotes).
+-- If getCallStack and getSubprograms are called inside package body then an empty table is returned.
+-- The names returned never contain double quotes.
+-- tCallStack: information returned by getCallStack if tDepth is set or information returned by getCallStackLine.
+-- tDepth: number of requested line if tCallStack = getCallStack, null otherwise.
+-- See: utl_call_stack.subprogram
+function getSubprograms( tCallStack in varchar2, tDepth in number default null ) return str_table;
+
+-- Returns a table of types of requested subprograms.
+-- Example: package "outer" contains procedure "inner" which contains function "inner_function".
+-- getCallStack and subsequent getSubprogramsTypes are called inside the function.
+-- An array [ "PROCEDURE", "FUNCTION" ] would be returned (without double quotes).
+-- If getCallStack and getSubprogramsTypes are called inside package body then an empty table is returned.
+-- Each value in the returned array is one of PROCEDURE or FUNCTION.
+-- tCallStack: information returned by getCallStack if tDepth is set or information returned by getCallStackLine.
+-- tDepth: number of requested line if tCallStack = getCallStack, null otherwise.
+function getSubprogramsTypes( tCallStack in varchar2, tDepth in number default null ) return str_table;
+
 -- Returns the hierarchy of names separated by dot from outermost to innermost program unit.
 -- Example: package "outer" contains procedure "inner" which contains function "inner_function".
 -- getCallStack and subsequent getSubprogram are called inside the function.
@@ -805,6 +826,115 @@ begin
   tCallLine := substr( tCallLine, 1, pos );
   pos := instr( tCallLine, '.', -1 );
   return substr( tCallLine, pos + 1 );
+end;
+
+-- Returns a table of names of requested subprograms.
+-- Example: package "outer" contains procedure "inner" which contains function "inner_function".
+-- getCallStack and subsequent getSubprograms are called inside the function.
+-- An array [ "inner", "inner_function" ] would be returned (without double quotes).
+-- If getCallStack and getSubprograms are called inside package body then an empty table is returned.
+-- The names returned never contain double quotes.
+-- tCallStack: information returned by getCallStack if tDepth is set or information returned by getCallStackLine.
+-- tDepth: number of requested line if tCallStack = getCallStack, null otherwise.
+-- See: utl_call_stack.subprogram
+function getSubprograms( tCallStack in varchar2, tDepth in number default null ) return str_table is
+  tCallLine varchar2( 4000 ) := case when tDepth is null then tCallStack else getCallStackLine( tCallStack, tDepth ) end;
+  pos pls_integer;
+  dqpos pls_integer;
+  tLexicalDepth pls_integer;
+  tSubprogram varchar2( 4000 );
+  ret str_table := str_table();
+begin
+  if getLexicalDepth( tCallLine ) = 0 then
+    return ret;
+  end if;
+  tLexicalDepth := 0;
+  loop
+    dqpos := instr( tCallLine, '"' );
+    pos := instr( tCallLine, '.' );
+    if dqpos > 0 and dqpos < pos then
+      dqpos := instr( tCallLine, '"', dqpos + 1 );
+      while pos > 0 and pos < dqpos loop
+        pos := instr( tCallLine, '.', pos + 1 );
+      end loop;
+    end if;
+    if tLexicalDepth >= 2 then
+      if pos > 0 then
+        tSubprogram := substr( tCallLine, 1, pos - 1 );
+      else
+        tSubprogram := tCallLine;
+      end if;
+      if tSubprogram like 'FUNCTION %' then
+        tSubprogram := substr( tSubprogram, 10 );
+      elsif tSubprogram like 'PROCEDURE %' then
+        tSubprogram := substr( tSubprogram, 11 );
+      end if;
+      if tSubprogram like '%"%' then
+        tSubprogram := translate( tSubprogram, ' "', ' ' );
+      end if;
+      ret.extend;
+      ret( ret.count ) := tSubprogram;
+    end if;
+    if pos > 0 then
+      tCallLine := substr( tCallLine, pos + 1 );
+      tLexicalDepth := tLexicalDepth + 1;
+    else
+      exit;
+    end if;
+  end loop;
+  return ret;
+end;
+
+-- Returns a table of types of requested subprograms.
+-- Example: package "outer" contains procedure "inner" which contains function "inner_function".
+-- getCallStack and subsequent getSubprogramsTypes are called inside the function.
+-- An array [ "PROCEDURE", "FUNCTION" ] would be returned (without double quotes).
+-- If getCallStack and getSubprogramsTypes are called inside package body then an empty table is returned.
+-- Each value in the returned array is one of PROCEDURE or FUNCTION.
+-- tCallStack: information returned by getCallStack if tDepth is set or information returned by getCallStackLine.
+-- tDepth: number of requested line if tCallStack = getCallStack, null otherwise.
+function getSubprogramsTypes( tCallStack in varchar2, tDepth in number default null ) return str_table is
+  tCallLine varchar2( 4000 ) := case when tDepth is null then tCallStack else getCallStackLine( tCallStack, tDepth ) end;
+  pos pls_integer;
+  dqpos pls_integer;
+  tLexicalDepth pls_integer;
+  tSubprogram varchar2( 4000 );
+  ret str_table := str_table();
+begin
+  if getLexicalDepth( tCallLine ) = 0 then
+    return ret;
+  end if;
+  tLexicalDepth := 0;
+  loop
+    dqpos := instr( tCallLine, '"' );
+    pos := instr( tCallLine, '.' );
+    if dqpos > 0 and dqpos < pos then
+      dqpos := instr( tCallLine, '"', dqpos + 1 );
+      while pos > 0 and pos < dqpos loop
+        pos := instr( tCallLine, '.', pos + 1 );
+      end loop;
+    end if;
+    if tLexicalDepth >= 2 then
+      if pos > 0 then
+        tSubprogram := substr( tCallLine, 1, pos - 1 );
+      else
+        tSubprogram := tCallLine;
+      end if;
+      ret.extend;
+      if tSubprogram like 'FUNCTION %' then
+        ret( ret.count ) := 'FUNCTION';
+      elsif tSubprogram like 'PROCEDURE %' then
+        ret( ret.count ) := 'PROCEDURE';
+      end if;
+    end if;
+    if pos > 0 then
+      tCallLine := substr( tCallLine, pos + 1 );
+      tLexicalDepth := tLexicalDepth + 1;
+    else
+      exit;
+    end if;
+  end loop;
+  return ret;
 end;
 
 -- Returns the hierarchy of names separated by dot from outermost to innermost program unit.
