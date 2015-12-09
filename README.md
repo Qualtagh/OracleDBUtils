@@ -37,7 +37,15 @@ Contents:
   10. [getProgramType](#getProgramType)
   11. [getSubprogram](#getSubprogram)
   12. [getSubprogramType](#getSubprogramType)
-  13. [getConcatenatedSubprograms](#getConcatenatedSubprograms)
+  13. [getSubprograms](#getSubprograms)
+  14. [getSubprogramsTypes](#getSubprogramsTypes)
+  15. [getConcatenatedSubprograms](#getConcatenatedSubprograms)
+  16. [getErrorStack](#getErrorStack)
+  17. [getErrorDepth](#getErrorDepth)
+  18. [getErrorCode](#getErrorCode)
+  19. [getErrorMessage](#getErrorMessage)
+  20. [getBacktraceStack](#getBacktraceStack)
+  21. [getBacktraceDepth](#getBacktraceDepth)
 4. [String aggregation](#string-aggregation)
 5. [Links to other packages from various authors](#links-to-other-packages-from-various-authors)
 
@@ -550,13 +558,25 @@ ___
 ```pl-sql
 function getSubprogram( tCallStack in varchar2, tDepth in number default null ) return varchar2;
 ```
-Returns a name of a requested innermost subprogram. The name returned never contains double quotes. Similar to `utl_call_stack.subprogram`.
+Returns a name of a requested innermost subprogram. The name returned never contains double quotes.
 ___
 <a name="getSubprogramType"></a>
 ```pl-sql
 function getSubprogramType( tCallStack in varchar2, tDepth in number default null ) return varchar2;
 ```
 Returns a type of requested innermost subprogram. Value returned is one of `PROCEDURE` or `FUNCTION`.
+___
+<a name="getSubprograms"></a>
+```pl-sql
+function getSubprograms( tCallStack in varchar2, tDepth in number default null ) return str_table;
+```
+Returns an array of names of a requested subprograms. Names returned never contain double quotes. Similar to `utl_call_stack.subprogram` except for the outermost program name: it is included in `utl_call_stack` and is not included in `getSubprograms`.
+___
+<a name="getSubprogramsTypes"></a>
+```pl-sql
+function getSubprogramsTypes( tCallStack in varchar2, tDepth in number default null ) return str_table;
+```
+Returns an array of types of requested subprograms. Each value in the array returned is one of `PROCEDURE` or `FUNCTION`.
 ___
 <a name="getConcatenatedSubprograms"></a>
 ```pl-sql
@@ -565,6 +585,132 @@ function getConcatenatedSubprograms( tCallStack in varchar2, tDepth in number de
 Returns the hierarchy of names separated by dot from outermost to innermost program unit.
 If one of program units in this hierarchy has double quotes in its name, they would be preserved.
 Similar to `utl_call_stack.concatenate_subprogram`.
+___
+<a name="getErrorStack"></a>
+```pl-sql
+function getErrorStack( tDepth in number default null ) return varchar2;
+```
+Returns an error stack as a string.
+
+`tDepth` is the number of requested stack line. Lesser numbers are most recent errors. Numeration starts from 1.
+If omitted then the full stack is concatenated via newline character.
+If `tDepth` is out of bounds then `null` is returned.
+The full stack output equals to `dbms_utility.format_call_stack`.
+___
+<a name="getErrorDepth"></a>
+```pl-sql
+function getErrorDepth( tErrorStack in varchar2 default '' ) return number;
+```
+Returns current error stack depth.
+Similar to `utl_call_stack.error_depth`.
+
+`tErrorStack` is the information returned by `getErrorStack`. Can be omitted.
+___
+<a name="getErrorCode"></a>
+```pl-sql
+function getErrorCode( tErrorStack in varchar2, tDepth in number default null ) return number;
+```
+Returns error code at a given depth.
+Similar to `utl_call_stack.error_number`.
+
+`tErrorStack` is the information returned by `getErrorStack`.
+
+`tDepth` is the number of requested stack line if `tErrorStack = getErrorStack`, `null` otherwise.
+___
+<a name="getErrorMessage"></a>
+```pl-sql
+function getErrorMessage( tErrorStack in varchar2, tDepth in number default null ) return varchar2;
+```
+Returns error message at a given depth.
+Similar to `utl_call_stack.error_msg`.
+
+`tErrorStack` is the information returned by `getErrorStack`.
+
+`tDepth` is the number of requested stack line if `tErrorStack = getErrorStack`, `null` otherwise.
+___
+<a name="getBacktraceStack"></a>
+```pl-sql
+function getBacktraceStack( tDepth in number default null ) return varchar2;
+```
+Returns a backtrace stack as a string.
+It shows program units and line numbers where the last error has occurred.
+The output format is the same as in `getCallStack`.
+See [getCallStack](#getCallStack) documentation to get more information about the output format.
+Use methods like `getProgramType`, `getSubprograms` etc. to get properties of the backtrace stack like it's done with `getCallStack`.
+Similar to `dbms_utility.format_error_backtrace`.
+
+`tDepth` is the number of requested stack line. Lesser numbers are most recent calls. Numeration starts from 1.
+
+- The order equals to the order returned by `dbms_utility.format_error_backtrace`.
+- Also, the order equals to the order returned by `getCallStack`.
+- But it doesn't equal to the order returned by `utl_call_stack.backtrace_unit` which is reversed.
+
+If `tDepth` is omitted then the full stack is concatenated via newline character.
+
+`getBacktraceStack` and `getBacktraceDepth` functions are implemented via a call to `dbms_utility.format_error_backtrace` which appeared in Oracle 10.
+So the version of the package `p_stack` for Oracle 9 does not contain these methods.
+
+`getBacktraceStack` method provides more functionality than `utl_call_stack`. The latter one provides information only about the outermost program unit name and owner and about line number.
+`getBacktraceStack` allows to get inner procedures and functions names and types as it's done in `getCallStack`.
+
+However, there exists one more limitation comparing to `getCallStack`. The method `dbms_utility.format_error_backtrace` returns only the name of the program unit without its type. It may lead to ambiguity if the error occurs in a package. Take a look at the example:
+```pl-sql
+create or replace package pckg is
+  n number := 1 / trunc( dbms_random.value( 0, 2 ) );
+  
+  q varchar2( 100 ) := 'PACKAGE INITIALIZED PROPERLY';
+  
+  procedure null_proc;
+end;
+/
+create or replace package body pckg is
+  m number := 1 / 0;
+  
+  procedure null_proc is
+  begin
+    null;
+  end;
+end;
+/
+begin
+  begin
+    pckg.null_proc;
+  exception
+    when OTHERS then
+      dbms_output.put_line( dbms_utility.format_error_backtrace );
+  end;
+  dbms_output.put_line( pckg.q );
+end;
+/
+drop package body pckg;
+drop package pckg;
+```
+Run this script several times. With 50% probability the output would be:
+```
+ORA-06512: at "YOUR_SCHEMA.PCKG", line 2
+ORA-06512: at line 3
+```
+It means that the package variable `q` was not initialized. So a division by zero exception occurred at `n` initialization in a package (not in its body).
+
+In other cases the output would be:
+```
+ORA-06512: at "YOUR_SCHEMA.PCKG", line 2
+ORA-06512: at line 3
+
+PACKAGE INITIALIZED PROPERLY
+```
+The package variable `q` was initialized. So a division by zero was raised at `m` initialization in the package body. But the output of `dbms_utility.format_error_backtrace` is the same in both cases. So it's impossible to distinguish packages and their bodies at backtrace stack parsing.
+
+`getBacktraceStack` assumes that the type of the program unit is always `PACKAGE BODY` when such an ambiguity happens because errors in package initialization are quite rare.
+___
+<a name="getBacktraceDepth"></a>
+```pl-sql
+function getBacktraceDepth( tBacktraceStack in varchar2 default '' ) return number;
+```
+Returns backtrace stack depth.
+Similar to `utl_call_stack.backtrace_depth`.
+
+`tBacktraceStack` is the information returned by `getBacktraceStack`. Can be omitted.
 ___
 **Installation notes:**
 

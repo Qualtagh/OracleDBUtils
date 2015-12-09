@@ -156,6 +156,11 @@ function getErrorMessage( tErrorStack in varchar2, tDepth in number default null
 -- See: dbms_utility.format_error_backtrace
 function getBacktraceStack( tDepth in number default null ) return varchar2;
 
+-- Returns backtrace stack depth.
+-- tBacktraceStack: information returned by getBacktraceStack. Can be omitted.
+-- See: utl_call_stack.backtrace_depth
+function getBacktraceDepth( tBacktraceStack in varchar2 default '' ) return number;
+
 end;
 /
 create or replace package body p_stack is
@@ -1186,6 +1191,20 @@ begin
     end if;
   end loop;
   return getCallStack( ret, tDepth );
+end;
+
+-- Returns backtrace stack depth.
+-- tBacktraceStack: information returned by getBacktraceStack. Can be omitted.
+-- See: utl_call_stack.backtrace_depth
+function getBacktraceDepth( tBacktraceStack in varchar2 default '' ) return number is
+  tCallPositions varchar2( 4000 );
+begin
+  if tBacktraceStack is null then
+    tCallPositions := dbms_utility.format_error_backtrace;
+    return greatest( nvl( length( tCallPositions ) - length( replace( tCallPositions, CHAR_NEW_LINE ) ), 0 ), 0 );
+  else
+    return greatest( nvl( length( tBacktraceStack ) - length( replace( tBacktraceStack, CHAR_NEW_LINE ) ) + 1, 0 ), 0 );
+  end if;
 end;
 
 end;
