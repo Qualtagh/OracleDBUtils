@@ -615,7 +615,7 @@ Similar to `utl_call_stack.error_number`.
 
 `tErrorStack` is the information returned by `getErrorStack`.
 
-`tDepth` is the number of requested stack line if `tErrorStack = getErrorStack`, `null` otherwise.
+`tDepth` is the number of requested stack line if `tErrorStack` = `getErrorStack`, `null` otherwise.
 ___
 <a name="getErrorMessage"></a>
 ```pl-sql
@@ -626,7 +626,7 @@ Similar to `utl_call_stack.error_msg`.
 
 `tErrorStack` is the information returned by `getErrorStack`.
 
-`tDepth` is the number of requested stack line if `tErrorStack = getErrorStack`, `null` otherwise.
+`tDepth` is the number of requested stack line if `tErrorStack` = `getErrorStack`, `null` otherwise.
 ___
 <a name="getBacktraceStack"></a>
 ```pl-sql
@@ -636,7 +636,7 @@ Returns a backtrace stack as a string.
 It shows program units and line numbers where the last error has occurred.
 The output format is the same as in `getCallStack`.
 See [getCallStack](#getCallStack) documentation to get more information about the output format.
-Use methods like `getProgramType`, `getSubprograms` etc. to get properties of the backtrace stack like it's done with `getCallStack`.
+Use methods like `getProgramType`, `getSubprograms` and others to get properties of the backtrace stack like it's done with `getCallStack`.
 Similar to `dbms_utility.format_error_backtrace`.
 
 `tDepth` is the number of requested stack line. Lesser numbers are most recent calls. Numeration starts from 1.
@@ -650,13 +650,13 @@ If `tDepth` is omitted then the full stack is concatenated via newline character
 `getBacktraceStack` and `getBacktraceDepth` functions are implemented via a call to `dbms_utility.format_error_backtrace` which appeared in Oracle 10.
 So the version of the package `p_stack` for Oracle 9 does not contain these methods.
 
-`getBacktraceStack` method provides more functionality than `utl_call_stack`. The latter one provides information only about the outermost program unit name and owner and about line number.
+`getBacktraceStack` method provides more functionality than `utl_call_stack`. The latter one provides information only about the outermost program unit name, owner and a line number.
 `getBacktraceStack` allows to get inner procedures and functions names and types as it's done in `getCallStack`.
 
 However, there exists one more limitation comparing to `getCallStack`. The method `dbms_utility.format_error_backtrace` returns only the name of the program unit without its type. It may lead to ambiguity if the error occurs in a package. Take a look at the example:
 ```pl-sql
 create or replace package pckg is
-  n number := 1 / trunc( dbms_random.value( 0, 2 ) );
+  n number := 1 / trunc( dbms_random.value( 0, 2 ) ); -- Raise division by zero exception with 50% probability.
   
   q varchar2( 100 ) := 'PACKAGE INITIALIZED PROPERLY';
   
