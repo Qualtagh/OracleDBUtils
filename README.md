@@ -511,6 +511,8 @@ DEPTH LINE OWNER       LEX  PROGRAM_TYPE    PROGRAM SUBPROGRAM_TYPE SUBPROGRAM  
 4     28   YOUR_SCHEMA 0    ANONYMOUS BLOCK         ANONYMOUS BLOCK              ANONYMOUS BLOCK
 ```
 The rest functions simulate the behaviour of `utl_call_stack` package.
+
+If you simply need a string output in default format then use `dbms_output.put_line( p_stack.getCallStack )`.
 ___
 <a name="getDynamicDepth"></a>
 ```pl-sql
@@ -643,6 +645,7 @@ DEPTH CODE       MESSAGE
 2     ORA-01403  no data found
 3     ORA-01476  divisor is equal to zero
 ```
+If you simply need a string output in default format then use `dbms_output.put_line( p_stack.getErrorStack )`.
 ___
 <a name="getErrorDepth"></a>
 ```pl-sql
@@ -812,6 +815,8 @@ DEPTH LINE OWNER       LEX  PROGRAM_TYPE    PROGRAM    SUBPROGRAM_TYPE SUBPROGRA
 4     11   YOUR_SCHEMA 0    ANONYMOUS BLOCK            ANONYMOUS BLOCK              ANONYMOUS BLOCK
 ```
 It shows the full backtrace of an error (division by zero) from the line where an error has happened (depth 1) to the line where the function was called and the error was catched (depth 4).
+
+If you simply need a string output in default format then use `dbms_output.put_line( p_stack.getBacktraceStack )`.
 ___
 **Installation notes:**
 
