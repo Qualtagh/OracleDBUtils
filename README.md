@@ -336,10 +336,10 @@ Also, there's a function `dbms_utility.format_call_stack` which allows to get th
 Oracle 12 introduces a package `utl_call_stack` which provides information about subprogram units. In Oracle versions prior to 12, there's no way to get subprogram name except parsing the source code.
 The purpose of package `p_stack` is to find subprogram name by parsing the source code according to information returned by `dbms_utility.format_call_stack`.
 
-There are two versions of this package released: one for Oracle 9 (`p_stack.9.sql`) and another one for Oracle 10 and 11 (`p_stack.sql`).
+There are two versions of this package released: one for Oracle 9 (`p_stack.9.sql`) and another one for Oracle 10 and 11 (`p_stack.sql`). Also, you can use the latter one in Oracle 12 as well. `p_stack` provides some information that `utl_call_stack` lacks: program and subprogram types (PACKAGE, PROCEDURE, FUNCTION etc.), subprogram names for backtrace stack.
 
-Anonymous classes source code is retrieved via views `V$SQL` and `V$SQLTEXT_WITH_NEWLINES`. Stored program units code is gained via `ALL_SOURCE`.
-This package is written in pure PL/SQL. Double quoted identifiers  are supported. Strings `q`-notation is supported too. Procedures and functions without definitions are skipped properly.
+Anonymous classes source code is retrieved via views `V$SQL` and `V$SQLTEXT_WITH_NEWLINES`. Stored program units code is gained via `ALL_SOURCE`. The type of the program unit in `getBacktraceStack` is requested from `ALL_OBJECTS`.
+This package is written in pure PL/SQL. Double quoted identifiers are supported. Strings `q`-notation is supported too. Procedures and functions without definitions are skipped properly.
 Conditional compilation is supported. Multiline and one-line comments are skipped properly. Calls via database link aren't traced by `dbms_utility.format_call_stack` so they aren't traced by `p_stack` too.
 One-liner subprogram definitions cannot be distinguished (see example below).
 [predefined inquiry directives]:http://docs.oracle.com/cd/B19306_01/appdev.102/b14261/fundamentals.htm#BEIBIDCE

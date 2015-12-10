@@ -235,7 +235,7 @@ begin
     end if;
     pos := instr( tCallPositionsLine, ' ' );
     if pos > 0 then
-      tHandle := hextoraw( substr( tCallPositionsLine, 1, pos - 1 ) );
+      tHandle := hextoraw( replace( substr( tCallPositionsLine, 1, pos - 1 ), '0x', '00000000' ) );
       tCallPositionsLine := ltrim( substr( tCallPositionsLine, pos ) );
     else
       tHandle := null;
@@ -654,8 +654,6 @@ end;
 -- SUBPROGRAM NAME is the name of inner subprogram.
 -- If there are several inner units then all of them are separated by dots.
 function getCallStack( tDepth in number default null ) return varchar2 is
-  ret varchar2( 4000 );
-  pos pls_integer;
 begin
   return getCallStack( dbms_utility.format_call_stack, tDepth );
 end;
@@ -709,6 +707,11 @@ function getDynamicDepth( tCallStack in varchar2 default '' ) return number is
   tCallPositions varchar2( 4000 );
 begin
   if tCallStack is null then
+    $if not dbms_db_version.ver_le_10 $then
+      $if not dbms_db_version.ver_le_11 $then
+        return utl_call_stack.dynamic_depth;
+      $end
+    $end
     tCallPositions := dbms_utility.format_call_stack;
     return greatest( nvl( length( tCallPositions ) - length( replace( tCallPositions, CHAR_NEW_LINE ) ) - 3, 0 ), 0 );
   else
@@ -1036,6 +1039,11 @@ function getErrorDepth( tErrorStack in varchar2 default '' ) return number is
   nErrorStack varchar2( 4000 );
 begin
   if tErrorStack is null then
+    $if not dbms_db_version.ver_le_10 $then
+      $if not dbms_db_version.ver_le_11 $then
+        return utl_call_stack.error_depth;
+      $end
+    $end
     nErrorStack := getErrorStack;
   else
     nErrorStack := tErrorStack;
@@ -1200,6 +1208,11 @@ function getBacktraceDepth( tBacktraceStack in varchar2 default '' ) return numb
   tCallPositions varchar2( 4000 );
 begin
   if tBacktraceStack is null then
+    $if not dbms_db_version.ver_le_10 $then
+      $if not dbms_db_version.ver_le_11 $then
+        return utl_call_stack.backtrace_depth;
+      $end
+    $end
     tCallPositions := dbms_utility.format_error_backtrace;
     return greatest( nvl( length( tCallPositions ) - length( replace( tCallPositions, CHAR_NEW_LINE ) ), 0 ), 0 );
   else
