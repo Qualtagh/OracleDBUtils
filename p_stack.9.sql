@@ -730,6 +730,9 @@ begin
     tCallLine := substr( tCallLine, pos + 1 );
   end if;
   posTo := nvl( instr( tCallLine, '.' ), 0 );
+  if posTo = 0 then
+    posTo := length( tCallLine ) + 1;
+  end if;
   pos := nvl( instr( tCallLine, '"' ), 0 );
   if posTo > pos and pos > 0 then
     posTo := nvl( instr( tCallLine, '"', pos + 1 ), posTo );
