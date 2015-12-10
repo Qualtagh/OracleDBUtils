@@ -46,8 +46,9 @@ Contents:
   19. [getErrorMessage](#getErrorMessage)
   20. [getBacktraceStack](#getBacktraceStack)
   21. [getBacktraceDepth](#getBacktraceDepth)
-4. [String aggregation](#string-aggregation)
-5. [Links to other packages from various authors](#links-to-other-packages-from-various-authors)
+4. [utl_call_stack](#utl_call_stack)
+5. [String aggregation](#string-aggregation)
+6. [Links to other packages from various authors](#links-to-other-packages-from-various-authors)
 
 Released into public domain.
 
@@ -336,7 +337,7 @@ Also, there's a function `dbms_utility.format_call_stack` which allows to get th
 Oracle 12 introduces a package `utl_call_stack` which provides information about subprogram units. In Oracle versions prior to 12, there's no way to get subprogram name except parsing the source code.
 The purpose of package `p_stack` is to find subprogram name by parsing the source code according to information returned by `dbms_utility.format_call_stack`.
 
-There are two versions of this package released: one for Oracle 9 (`p_stack.9.sql`) and another one for Oracle 10 and 11 (`p_stack.sql`). Also, you can use the latter one in Oracle 12 as well. `p_stack` provides some information that `utl_call_stack` lacks: program and subprogram types (PACKAGE, PROCEDURE, FUNCTION etc.), subprogram names for backtrace stack.
+There are two versions of this package released: one for Oracle 9 (`p_stack.9.sql`) and another one for Oracle 10 and 11 (`p_stack.sql`). Also, you can use the latter one in Oracle 12 as well. `p_stack` provides some information that `utl_call_stack` lacks: program and subprogram types (PACKAGE, PROCEDURE, FUNCTION etc.), subprogram names for backtrace stack. Methods `getDynamicDepth`, `getErrorDepth` and `getBacktraceDepth` are optimized for Oracle 12 by calling `utl_call_stack` functions.
 
 Anonymous classes source code is retrieved via views `V$SQL` and `V$SQLTEXT_WITH_NEWLINES`. Stored program units code is gained via `ALL_SOURCE`. The type of the program unit in `getBacktraceStack` is requested from `ALL_OBJECTS`.
 This package is written in pure PL/SQL. Double quoted identifiers are supported. Strings `q`-notation is supported too. Procedures and functions without definitions are skipped properly.
@@ -715,6 +716,27 @@ ___
 **Installation notes:**
 
 Compile types.sql. Then compile p_stack.sql for Oracle 10 and 11, or p_stack.9.sql for Oracle 9. If the `owa` package is not available, replace its usages by commented `chr` functions. If the views `V$SQL` or `V$SQLTEXT_WITH_NEWLINES` are not available, just remove those blocks. The source code of anonymous blocks won't be parsed in this case. But it's not required for most applications.
+___
+#utl_call_stack
+Oracle 12 provides `utl_call_stack` package for handy call stack traversal.
+This repository contains a backport of `utl_call_stack` for Oracle 9, 10 and 11.
+
+Method `current_edition` is not implemented (always returns `null`).
+
+The implementation depends on `p_stack` package. Each call to backported `utl_call_stack` functions leads to program unit source code parsing. Package `p_stack` allows to store parsed results and traverse them for output (so, the parsing is done only once).
+
+Also, there is one additional method `backtrace_subprogram` which allows to print the chain of all inner procedures on the backtrace stack. Use it in conjunction with `concatenate_substring` method.
+
+Oracle 9 has no `dbms_utility.format_error_backtrace` method. So, it's impossible to implement backtrace processing methods in `p_stack`. It leads to the fact that backtrace processing methods in Oracle 9 version of `utl_call_stack` aren't implemented. `backtrace_depth` always returns 0. `backtrace_unit`, `backtrace_subprogram` and `backtrace_line` always raise `BAD_DEPTH_INDICATOR` exception.
+
+The code of `BAD_DEPTH_INDICATOR` exception is kept the same as in Oracle 12 (equals to -64610) for compatibility. It has no human-readable error message in Oracle versions prior to 12. And it's out of scope of user defined exceptions (20000-20999), so `raise_application_error` cannot be called. So, if the requested depth is out of range, you will see the following error message:
+```
+ORA-64610: Message 64610 not found; product=RDBMS; facility=ORA
+```
+___
+**Installation notes:**
+
+First, compile `p_stack` as described above. Then compile utl_call_stack.sql for Oracle 10 and 11, or utl_call_stack.9.sql for Oracle 9.
 ___
 #String aggregation
 String aggregation techniques are described in details [here][string aggregation].
