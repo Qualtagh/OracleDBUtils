@@ -394,6 +394,8 @@ end;
 begin
   APCKG.PROC;
 end;
+/
+drop package APCKG;
 ```
 Output:
 ```
@@ -410,6 +412,8 @@ end;
 begin
   outer_proc( trunc( dbms_random.value( 1, 3 ) ) );
 end;
+/
+drop procedure outer_proc;
 ```
 The output is:
 ```
@@ -597,6 +601,48 @@ Returns an error stack as a string.
 If omitted then the full stack is concatenated via newline character.
 If `tDepth` is out of bounds then `null` is returned.
 The full stack output equals to `dbms_utility.format_call_stack`.
+
+Sample usage:
+```pl-sql
+declare
+  x number;
+  tErrorStack varchar2( 4000 );
+  tErrorLine varchar2( 4000 );
+  tDepth pls_integer;
+begin
+  x := 1 / 0;
+exception
+  when OTHERS then
+    begin
+      select 1 into x from dual where 1 = 0;
+    exception
+      when OTHERS then
+        begin
+          select 1 into x from dual union all select 2 from dual;
+        exception
+          when OTHERS then
+            dbms_output.put_line( 'DEPTH CODE       MESSAGE' );
+            tErrorStack := p_stack.getErrorStack;
+            tDepth := p_stack.getErrorDepth( tErrorStack );
+            for i in 1 .. tDepth loop
+              tErrorLine := p_stack.getCallStackLine( tErrorStack, i );
+              dbms_output.put( rpad( i, 6 ) );
+              dbms_output.put( 'ORA-' );
+              dbms_output.put( lpad( p_stack.getErrorCode( tErrorLine ), 5, '0' ) );
+              dbms_output.put( '  ' );
+              dbms_output.put_line( p_stack.getErrorMessage( tErrorLine ) );
+            end loop;
+        end;
+    end;
+end;
+```
+Output:
+```
+DEPTH CODE       MESSAGE
+1     ORA-01422  exact fetch returns more than requested number of rows
+2     ORA-01403  no data found
+3     ORA-01476  divisor is equal to zero
+```
 ___
 <a name="getErrorDepth"></a>
 ```pl-sql
@@ -712,6 +758,60 @@ Returns backtrace stack depth.
 Similar to `utl_call_stack.backtrace_depth`.
 
 `tBacktraceStack` is the information returned by `getBacktraceStack`. Can be omitted.
+
+Sample usage:
+```pl-sql
+create or replace procedure outer_proc is
+  procedure inner_proc is
+    x number;
+  begin
+    x := 1 / 0;
+  end;
+begin
+  inner_proc;
+end;
+/
+declare
+  tBacktraceStack varchar2( 4000 );
+  tCallLine varchar2( 4000 );
+  tDepth pls_integer;
+  
+  procedure local_proc is
+  begin
+    outer_proc;
+  end;
+begin
+  local_proc;
+exception
+  when OTHERS then
+    tBacktraceStack := p_stack.getBacktraceStack;
+    tDepth := p_stack.getBacktraceDepth( tBacktraceStack );
+    dbms_output.put_line( 'DEPTH LINE OWNER       LEX  PROGRAM_TYPE    PROGRAM    SUBPROGRAM_TYPE SUBPROGRAM   CONCATENATED' );
+    for i in 1 .. tDepth loop
+      tCallLine := p_stack.getCallStackLine( tBacktraceStack, i );
+      dbms_output.put( rpad( i, 6 ) );
+      dbms_output.put( rpad( p_stack.getUnitLine( tCallLine ), 5 ) );
+      dbms_output.put( rpad( p_stack.getOwner( tCallLine ), 12 ) );
+      dbms_output.put( rpad( p_stack.getLexicalDepth( tCallLine ), 5 ) );
+      dbms_output.put( rpad( p_stack.getProgramType( tCallLine ), 16 ) );
+      dbms_output.put( rpad( nvl( p_stack.getProgram( tCallLine ), ' ' ), 11 ) );
+      dbms_output.put( rpad( nvl( p_stack.getSubprogramType( tCallLine ), ' ' ), 16 ) );
+      dbms_output.put( rpad( nvl( p_stack.getSubprogram( tCallLine ), ' ' ), 13 ) );
+      dbms_output.put_line( p_stack.getConcatenatedSubprograms( tCallLine ) );
+    end loop;
+end;
+/
+drop procedure outer_proc;
+```
+The output would be:
+```
+DEPTH LINE OWNER       LEX  PROGRAM_TYPE    PROGRAM    SUBPROGRAM_TYPE SUBPROGRAM   CONCATENATED
+1     5    YOUR_SCHEMA 1    PROCEDURE       OUTER_PROC PROCEDURE       INNER_PROC   OUTER_PROC.INNER_PROC
+2     8    YOUR_SCHEMA 0    PROCEDURE       OUTER_PROC PROCEDURE                    OUTER_PROC
+3     8    YOUR_SCHEMA 1    ANONYMOUS BLOCK            PROCEDURE       LOCAL_PROC   ANONYMOUS BLOCK.LOCAL_PROC
+4     11   YOUR_SCHEMA 0    ANONYMOUS BLOCK            ANONYMOUS BLOCK              ANONYMOUS BLOCK
+```
+It shows the full backtrace of an error (division by zero) from the line where an error has happened (depth 1) to the line where the function was called and the error was catched (depth 4).
 ___
 **Installation notes:**
 
@@ -733,6 +833,9 @@ The code of `BAD_DEPTH_INDICATOR` exception is kept the same as in Oracle 12 (eq
 ```
 ORA-64610: Message 64610 not found; product=RDBMS; facility=ORA
 ```
+Don't be scared: it just means that the requested depth is out of range.
+
+[This page](https://oracle-base.com/articles/12c/utl-call-stack-12cr1) has good examples of `utl_call_stack` usage.
 ___
 **Installation notes:**
 
