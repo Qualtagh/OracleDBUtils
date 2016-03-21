@@ -205,7 +205,7 @@ end;
 -- cast( ts as date ) rounds (half up) value before Oracle 11 and truncates value starting from Oracle 11.
 function truncToSeconds( tTimestamp in timestamp ) return date is
 begin
-  return tTimestamp;
+  return tTimestamp + 0;
 end;
 
 -- Leave only distinct XML nodes of a document.
