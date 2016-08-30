@@ -551,7 +551,7 @@ begin
                   if tCallStack( tCallStack.count ) like '+%' then
                     tCallStack.trim;
                   elsif tPrevToken = 'END' then
-                    if tCallStack( tCallStack.count ) = 'BEGIN' then
+                    if tCallStack( tCallStack.count ) in ( 'BEGIN', 'CASEEXPR' ) then
                       tCallStack.trim;
                     end if;
                   end if;
@@ -1163,6 +1163,9 @@ begin
       else
         pos := instr( tBacktrace, CHAR_NEW_LINE );
       end if;
+      if pos > 0 then
+        tBacktrace := substr( tBacktrace, pos + 1 );
+      end if;
       if tUnitName is null then
         tUnitName := 'anonymous block';
         tHandle := getCurrentSqlChildAddress;
@@ -1194,9 +1197,6 @@ begin
         tHandle := '00000000';
       end if;
       ret := ret || tHandle || lpad( to_char( tLineNumber ), 10 ) || '  ' || tUnitName || CHAR_NEW_LINE;
-      if pos > 0 then
-        tBacktrace := substr( tBacktrace, pos + 1 );
-      end if;
     else
       exit;
     end if;

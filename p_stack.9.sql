@@ -525,7 +525,7 @@ begin
                   if tCallStack( tCallStack.count ) like '+%' then
                     tCallStack.trim;
                   elsif tPrevToken = 'END' then
-                    if tCallStack( tCallStack.count ) = 'BEGIN' then
+                    if tCallStack( tCallStack.count ) in ( 'BEGIN', 'CASEEXPR' ) then
                       tCallStack.trim;
                     end if;
                   end if;
