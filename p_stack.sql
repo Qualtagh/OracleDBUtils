@@ -649,6 +649,52 @@ begin
   return ret;
 end;
 
+-- Leaves information about main program only in output of dbms_utility.format_call_stack.
+-- Oracle 12 includes subprograms to this output, so it's hard to find source code of main program.
+-- Private function.
+function removeSubprograms( stack in varchar2 ) return varchar2 is
+  ret varchar2( 4000 ) := '';
+  tCallPositions varchar2( 4000 ) := stack;
+  tCallPositionsLine varchar2( 255 );
+  tReached pls_integer := 0;
+  pos pls_integer;
+  tHandle raw( 16 );
+  tLine number;
+  tType varchar2( 255 );
+  tOwner varchar2( 255 );
+  tName varchar2( 255 );
+begin
+  loop
+    pos := instr( tCallPositions, CHAR_NEW_LINE );
+    exit when pos is null or pos = 0;
+    tCallPositionsLine := substr( tCallPositions, 1, pos - 1 );
+    tCallPositions := substr( tCallPositions, pos + 1 );
+    if tReached = 0 then
+      ret := ret || tCallPositionsLine || CHAR_NEW_LINE;
+      goto NEXT_CALL_POSITION;
+    end if;
+    parseCallStackLine( tCallPositionsLine, tHandle, tLine, tType, tOwner, tName );
+    $if not dbms_db_version.ver_le_10 $then
+      $if not dbms_db_version.ver_le_11 $then
+        tName := utl_call_stack.subprogram( tReached + 1 )( 1 );
+      $end
+    $end
+    ret := ret || rawtohex( tHandle ) || ' ' || tLine || ' ' || lower( tType );
+    if tType != 'ANONYMOUS BLOCK' then
+      ret := ret || ' ' || tOwner || '.' || tName;
+    end if;
+    ret := ret || CHAR_NEW_LINE;
+    <<NEXT_CALL_POSITION>>
+    if tReached > 0 then
+      tReached := tReached + 1;
+    elsif tCallPositionsLine like '%handle%number%name%' then
+      tReached := 1;
+    end if;
+  end loop;
+  ret := ret || tCallPositions;
+  return ret;
+end;
+
 -- Returns a call stack. The call of this procedure is included and is at the first line.
 -- tDepth: which line of stack to show. Lesser numbers are most recent calls. Numeration starts from 1.
 -- The call of this procedure has depth = 1.
@@ -667,8 +713,14 @@ end;
 -- SUBPROGRAM NAME is the name of inner subprogram.
 -- If there are several inner units then all of them are separated by dots.
 function getCallStack( tDepth in number default null ) return varchar2 is
+  stack varchar2( 4000 ) := dbms_utility.format_call_stack;
 begin
-  return getCallStack( dbms_utility.format_call_stack, tDepth );
+  $if not dbms_db_version.ver_le_10 $then
+    $if not dbms_db_version.ver_le_11 $then
+      stack := removeSubprograms( stack );
+    $end
+  $end
+  return getCallStack( stack, tDepth );
 end;
 
 -- Returns the stack information of a current program unit.
@@ -1104,7 +1156,7 @@ end;
 -- Returns CHILD_ADDRESS field of V$SQL view for current executing program.
 -- Private function.
 function getCurrentSqlChildAddress return varchar2 is
-  ret varchar2( 4000 ) := dbms_utility.format_call_stack;
+  ret varchar( 4000 ) := dbms_utility.format_call_stack;
   pos pls_integer;
 begin
   if ret like '%anonymous block' || CHAR_NEW_LINE then
