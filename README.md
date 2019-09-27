@@ -813,7 +813,11 @@ If you simply need a string output in default format then use `dbms_output.put_l
 ___
 **Installation notes:**
 
-Compile types.sql. Then compile p_stack.sql for Oracle 10 and 11, or p_stack.9.sql for Oracle 9. If the `owa` package is not available, replace its usages by commented `chr` functions. If the views `V$SQL` or `V$SQLTEXT_WITH_NEWLINES` are not available, just remove those blocks. The source code of anonymous blocks won't be parsed in this case. But it's not required for most applications.
+Compile types.sql. Then compile p_stack.9.sql for Oracle 9, or p_stack.sql for later versions. If the `owa` package is not available, replace its usages by commented `chr` functions. If the views `V$SQL` or `V$SQLTEXT_WITH_NEWLINES` are not available, just remove those blocks. The source code of anonymous blocks won't be parsed in this case. But it's not required for most applications.
+___
+**Development notes:**
+
+The file p_stack_tests.sql contains a simple set of unit tests.
 ___
 # utl_call_stack
 Oracle 12 provides `utl_call_stack` package for handy call stack traversal.
