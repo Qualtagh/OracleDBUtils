@@ -581,7 +581,7 @@ begin
                                                     else '-TYP'
                                                   end || tToken;
               end if;
-              if tLookForDefinition = 1 and tPrevToken in ( 'IS', 'AS' ) and tToken not in ( 'NOT', 'NULL' ) then
+              if tLookForDefinition = 1 and tPrevToken in ( 'IS', 'AS' ) and tToken not in ( 'NOT', 'NULL', 'LANGUAGE' ) then
                 tLookForDefinition := 0;
               end if;
             end if;
