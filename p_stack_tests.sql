@@ -102,4 +102,33 @@ begin
   outer_proc;
 end;
 /
+create or replace package JAVA_PKG is
+  procedure begin_test;
+  procedure test_java is
+    language java name 'TestClass.Method1()';
+  procedure end_test;
+end;
+/
+create or replace package body JAVA_PKG is
+  procedure begin_test is
+  begin
+    assert_eq( p_stack.whoAmI, '4: <USER>.PACKAGE BODY JAVA_PKG.PROCEDURE BEGIN_TEST' );
+  end;
+  procedure test_java_1 is
+    language java name 'TestClass.Method1()';
+  procedure test_java_2 is
+    language java name 'TestClass.Method2(java.lang.String)';
+  procedure end_test is
+  begin
+    assert_eq( p_stack.whoAmI, '12: <USER>.PACKAGE BODY JAVA_PKG.PROCEDURE END_TEST' );
+  end;
+end;
+/
+begin
+  JAVA_PKG.begin_test;
+  JAVA_PKG.end_test;
+end;
+/
+drop package JAVA_PKG;
+/
 drop procedure assert_eq;
