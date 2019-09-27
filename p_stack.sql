@@ -1104,7 +1104,7 @@ end;
 -- Returns CHILD_ADDRESS field of V$SQL view for current executing program.
 -- Private function.
 function getCurrentSqlChildAddress return varchar2 is
-  ret varchar( 4000 ) := dbms_utility.format_call_stack;
+  ret varchar2( 4000 ) := dbms_utility.format_call_stack;
   pos pls_integer;
 begin
   if ret like '%anonymous block' || CHAR_NEW_LINE then
