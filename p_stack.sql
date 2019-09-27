@@ -676,7 +676,7 @@ begin
     parseCallStackLine( tCallPositionsLine, tHandle, tLine, tType, tOwner, tName );
     $if not dbms_db_version.ver_le_10 $then
       $if not dbms_db_version.ver_le_11 $then
-        tName := utl_call_stack.subprogram( tReached + 1 )( 1 );
+        tName := sys.utl_call_stack.subprogram( tReached + 1 )( 1 );
       $end
     $end
     ret := ret || rawtohex( tHandle ) || ' ' || tLine || ' ' || lower( tType );
@@ -774,7 +774,7 @@ begin
   if tCallStack is null then
     $if not dbms_db_version.ver_le_10 $then
       $if not dbms_db_version.ver_le_11 $then
-        return utl_call_stack.dynamic_depth;
+        return sys.utl_call_stack.dynamic_depth;
       $end
     $end
     tCallPositions := dbms_utility.format_call_stack;
@@ -1109,7 +1109,7 @@ begin
   if tErrorStack is null then
     $if not dbms_db_version.ver_le_10 $then
       $if not dbms_db_version.ver_le_11 $then
-        return utl_call_stack.error_depth;
+        return sys.utl_call_stack.error_depth;
       $end
     $end
     nErrorStack := getErrorStack;
@@ -1278,7 +1278,7 @@ begin
   if tBacktraceStack is null then
     $if not dbms_db_version.ver_le_10 $then
       $if not dbms_db_version.ver_le_11 $then
-        return utl_call_stack.backtrace_depth;
+        return sys.utl_call_stack.backtrace_depth;
       $end
     $end
     tCallPositions := dbms_utility.format_error_backtrace;
