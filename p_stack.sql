@@ -640,12 +640,10 @@ begin
     ret := ret || tLine || ': ' || tOwner || '.' || tCallStackLine;
     exit when tDepth = tReached;
     <<NEXT_CALL_POSITION>>
-    if tReached = 0 then
-      if tCallPositionsLine like '%handle%number%name%' then
-        tReached := 1;
-      end if;
-    else
+    if tReached > 0 then
       tReached := tReached + 1;
+    elsif tCallPositionsLine like '%handle%number%name%' then
+      tReached := 1;
     end if;
   end loop;
   return ret;
