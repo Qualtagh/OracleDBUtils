@@ -164,6 +164,51 @@ cursor getSource( tOwner in varchar2, tName in varchar2, tType in varchar2, tLin
     and LINE <= tLine
   order by LINE;
 
+-- Retrieves info from one line of dbms_utility.format_call_stack output
+-- tCallPositionsLine: one line of dbms_utility.format_call_stack output
+-- tHandle: CHILD_ADDRESS of source code in V$SQL view
+-- tLine: line number in source code
+-- tType: program type (see available values in getProgramType description)
+-- tOwner: schema of stored procedure
+-- tName: name of stored procedure
+-- Private function.
+procedure parseCallStackLine( tCallPositionsLine in varchar2, tHandle out raw, tLine out number, tType out varchar2, tOwner out varchar2, tName out varchar2 ) is
+  pos pls_integer;
+  tCallLine varchar2( 255 ) := tCallPositionsLine;
+begin
+  pos := instr( tCallLine, ' ' );
+  if pos > 0 then
+    tHandle := hextoraw( substr( tCallLine, 1, pos - 1 ) );
+    tCallLine := ltrim( substr( tCallLine, pos ) );
+  else
+    tHandle := null;
+  end if;
+  pos := instr( tCallLine, ' ' );
+  if pos > 0 then
+    tLine := to_number( substr( tCallLine, 1, pos - 1 ) );
+    tCallLine := ltrim( substr( tCallLine, pos ) );
+  else
+    tLine := null;
+  end if;
+  tType := case substr( tCallLine, 1, 3 )
+             when 'pro' then 'PROCEDURE'
+             when 'fun' then 'FUNCTION'
+             when 'tri' then 'TRIGGER'
+             when 'typ' then 'TYPE BODY'
+             when 'pac' then case when tCallLine like 'package body%' then 'PACKAGE BODY' else 'PACKAGE' end
+             else 'ANONYMOUS BLOCK'
+           end;
+  tCallLine := substr( tCallLine, length( tType ) + 2 );
+  pos := instr( tCallLine, '.' );
+  if pos > 0 then
+    tOwner := substr( tCallLine, 1, pos - 1 );
+    tName := substr( tCallLine, pos + 1 );
+  else
+    tOwner := '';
+    tName := '';
+  end if;
+end;
+
 -- Returns a call stack. The call of this procedure is included and is at the first line.
 -- tDepth: which line of stack to show. Lesser numbers are most recent calls. Numeration starts from 1.
 -- The call of this procedure has depth = 1.
@@ -229,38 +274,8 @@ begin
     if tReached = 0 or tDepth != tReached then
       goto NEXT_CALL_POSITION;
     end if;
-    pos := instr( tCallPositionsLine, ' ' );
-    if pos > 0 then
-      tHandle := hextoraw( substr( tCallPositionsLine, 1, pos - 1 ) );
-      tCallPositionsLine := ltrim( substr( tCallPositionsLine, pos ) );
-    else
-      tHandle := null;
-    end if;
-    pos := instr( tCallPositionsLine, ' ' );
-    if pos > 0 then
-      tLine := to_number( substr( tCallPositionsLine, 1, pos - 1 ) );
-      tCallPositionsLine := ltrim( substr( tCallPositionsLine, pos ) );
-    else
-      tLine := null;
-    end if;
-    tType := case substr( tCallPositionsLine, 1, 3 )
-               when 'pro' then 'PROCEDURE'
-               when 'fun' then 'FUNCTION'
-               when 'tri' then 'TRIGGER'
-               when 'typ' then 'TYPE BODY'
-               when 'pac' then case when tCallPositionsLine like 'package body%' then 'PACKAGE BODY' else 'PACKAGE' end
-               else 'ANONYMOUS BLOCK'
-             end;
+    parseCallStackLine( tCallPositionsLine, tHandle, tLine, tType, tOwner, tName );
     tAnonymousBlock := case when tType = 'ANONYMOUS BLOCK' then 1 else 0 end;
-    tCallPositionsLine := substr( tCallPositionsLine, length( tType ) + 2 );
-    pos := instr( tCallPositionsLine, '.' );
-    if pos > 0 then
-      tOwner := substr( tCallPositionsLine, 1, pos - 1 );
-      tName := substr( tCallPositionsLine, pos + 1 );
-    else
-      tOwner := '';
-      tName := '';
-    end if;
     tCommented := 0;
     tIdentifier := 0;
     tString := 0;
