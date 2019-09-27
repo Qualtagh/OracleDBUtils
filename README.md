@@ -818,8 +818,9 @@ ___
 # utl_call_stack
 Oracle 12 provides `utl_call_stack` package for handy call stack traversal.
 This repository contains a backport of `utl_call_stack` for Oracle 9, 10 and 11.
+Also, it can be useful for Oracle 12 which lacks method `unit_type` (appeared in later versions).
 
-Method `current_edition` is not implemented (always returns `null`).
+Methods `current_edition` and `actual_edition` aren't implemented (always return `null`).
 
 The implementation depends on `p_stack` package. Each call to backported `utl_call_stack` functions leads to program unit source code parsing. Package `p_stack` allows to store parsed results and traverse them for output (so, the parsing is done only once).
 
@@ -837,7 +838,7 @@ Don't be scared: it just means that the requested depth is out of range.
 ___
 **Installation notes:**
 
-First, compile `p_stack` as described above. Then compile utl_call_stack.sql for Oracle 10 and 11, or utl_call_stack.9.sql for Oracle 9.
+First, compile `p_stack` as described above. Then compile utl_call_stack.9.sql for Oracle 9, or utl_call_stack.sql for later versions.
 ___
 # String aggregation
 String aggregation techniques are described in details [here](http://oracle-base.com/articles/misc/string-aggregation-techniques.php).
