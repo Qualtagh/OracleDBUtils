@@ -131,6 +131,27 @@ CREATE OR REPLACE PACKAGE utl_call_stack IS
   FUNCTION current_edition(dynamic_depth IN PLS_INTEGER) RETURN VARCHAR2;
 
   /*
+    Function: actual_edition
+
+    Returns the name of the edition in which the unit of the subprogram at the
+    specified dynamic depth is actual.
+
+    Parameters:
+
+      dynamic_depth - The depth in the call stack.
+
+    Returns:
+
+      The name of the edition in which the unit of the subprogram at the
+      specified dynamic depth is actual.
+
+    Exception:
+
+      Raises <BAD_DEPTH_INDICATOR>.
+   */
+  FUNCTION actual_edition(dynamic_depth IN PLS_INTEGER) RETURN VARCHAR2;
+
+  /*
     Function: unit_line
 
     Returns the line number of the unit of the subprogram at the specified
@@ -150,6 +171,26 @@ CREATE OR REPLACE PACKAGE utl_call_stack IS
       Raises <BAD_DEPTH_INDICATOR>.
    */
   FUNCTION unit_line(dynamic_depth IN PLS_INTEGER) RETURN PLS_INTEGER;
+
+  /*
+    Function: unit_type
+
+    Returns the type of the unit of the subprogram at the specified dynamic
+    depth.
+
+    Parameters:
+
+      dynamic_depth - The depth in the call stack.
+
+    Returns:
+
+      The type of the unit of the subprogram at the specified dynamic depth.
+
+    Exception:
+
+      Raises <BAD_DEPTH_INDICATOR>.
+   */
+  FUNCTION unit_type(dynamic_depth IN PLS_INTEGER) RETURN VARCHAR2;
 
   /*
     Function: dynamic_depth
@@ -454,6 +495,32 @@ CHAR_NEW_LINE constant char := chr( 10 );
   END;
 
   /*
+    Function: actual_edition
+
+    Returns the name of the edition in which the unit of the subprogram at the
+    specified dynamic depth is actual.
+
+    Parameters:
+
+      dynamic_depth - The depth in the call stack.
+
+    Returns:
+
+      The name of the edition in which the unit of the subprogram at the
+      specified dynamic depth is actual.
+
+    Exception:
+
+      Raises <BAD_DEPTH_INDICATOR>.
+   */
+  FUNCTION actual_edition(dynamic_depth IN PLS_INTEGER) RETURN VARCHAR2 IS
+  BEGIN
+    check_dynamic_depth( dynamic_depth );
+    -- Not implemented.
+    return '';
+  END;
+
+  /*
     Function: unit_line
 
     Returns the line number of the unit of the subprogram at the specified
@@ -476,6 +543,30 @@ CHAR_NEW_LINE constant char := chr( 10 );
   BEGIN
     check_dynamic_depth( dynamic_depth );
     return p_stack.getUnitLine( p_stack.getCallStack( dynamic_depth + 2 ) );
+  END;
+
+  /*
+    Function: unit_type
+
+    Returns the type of the unit of the subprogram at the specified dynamic
+    depth.
+
+    Parameters:
+
+      dynamic_depth - The depth in the call stack.
+
+    Returns:
+
+      The type of the unit of the subprogram at the specified dynamic depth.
+
+    Exception:
+
+      Raises <BAD_DEPTH_INDICATOR>.
+   */
+  FUNCTION unit_type(dynamic_depth IN PLS_INTEGER) RETURN VARCHAR2 IS
+  BEGIN
+    check_dynamic_depth( dynamic_depth );
+    return p_stack.getProgramType( p_stack.getCallStack( dynamic_depth + 2 ) );
   END;
 
   /*

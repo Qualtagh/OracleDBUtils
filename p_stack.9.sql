@@ -69,6 +69,7 @@ function getProgram( tCallStack in varchar2, tDepth in number default null ) ret
 -- ANONYMOUS BLOCK, PROCEDURE, FUNCTION, TRIGGER, PACKAGE, PACKAGE BODY, TYPE BODY.
 -- tCallStack: information returned by getCallStack if tDepth is set or information returned by getCallStackLine.
 -- tDepth: number of requested line if tCallStack = getCallStack, null otherwise.
+-- See: utl_call_stack.unit_type
 function getProgramType( tCallStack in varchar2, tDepth in number default null ) return varchar2;
 
 -- Returns a name of a requested innermost subprogram.
@@ -771,6 +772,7 @@ end;
 -- ANONYMOUS BLOCK, PROCEDURE, FUNCTION, TRIGGER, PACKAGE, PACKAGE BODY, TYPE BODY.
 -- tCallStack: information returned by getCallStack if tDepth is set or information returned by getCallStackLine.
 -- tDepth: number of requested line if tCallStack = getCallStack, null otherwise.
+-- See: utl_call_stack.unit_type
 function getProgramType( tCallStack in varchar2, tDepth in number default null ) return varchar2 is
   tCallLine varchar2( 4000 ) := case when tDepth is null then tCallStack else getCallStackLine( tCallStack, tDepth ) end;
   pos pls_integer;
