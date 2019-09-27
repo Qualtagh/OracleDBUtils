@@ -190,7 +190,6 @@ function getCallStack( tFormatCallStack in varchar2, tDepth in number default nu
   tCallPositions varchar2( 4000 );
   tCallPositionsLine varchar2( 255 );
   tReached pls_integer;
-  tHandleStr varchar2( 255 );
   tHandle raw( 16 );
   tOwner varchar2( 255 );
   tName varchar2( 255 );
@@ -236,11 +235,7 @@ begin
     end if;
     pos := instr( tCallPositionsLine, ' ' );
     if pos > 0 then
-      tHandleStr := replace( substr( tCallPositionsLine, 1, pos - 1 ), '0x', '' );
-      if length( tHandleStr ) = 8 then
-        tHandleStr := '00000000' || tHandleStr;
-      end if;
-      tHandle := hextoraw( tHandleStr );
+      tHandle := hextoraw( lpad( replace( substr( tCallPositionsLine, 1, pos - 1 ), '0x', '' ), 16, '0' ) );
       tCallPositionsLine := ltrim( substr( tCallPositionsLine, pos ) );
     else
       tHandle := null;
