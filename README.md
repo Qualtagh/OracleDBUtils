@@ -303,7 +303,7 @@ ___
 ```PLpgSQL
 function distinguishXML( xml in XMLType ) return XMLType;
 ```
-Leave only distinct XML nodes of a document. This method is useful for string aggregation (see [String aggregation](#string-aggregation) section below).
+Leave only distinct XML nodes of a document. This method is useful for string aggregation (see [string aggregation](#string-aggregation) section below).
 ___
 <a name="calculate"></a>
 ```PLpgSQL
