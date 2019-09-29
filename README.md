@@ -879,11 +879,11 @@ This is an overloaded version of string_agg for CLOB argument. See: clob_agg.sql
 **XMLAgg.** Since: Oracle 9. One-liner: yes, verbose. CLOB support: yes. Distinguishability: no. Ordering: yes.
 
 **WM_CONCAT.** Since: Oracle 10. One-liner: yes. CLOB support: since 10.2.0.5.0. Distinguishability: yes. Ordering: no.
-Unofficial. Undocumented. It's better to use string_agg or clob_agg instead.
+Unofficial. Undocumented. Removed since Oracle 12. It's better to use string_agg or clob_agg instead.
 
 **COLLECT.** Since: Oracle 10. One-liner: yes. CLOB support: yes for output, no for input. Distinguishability: no. Ordering: no.
 
-**LISTAGG.** Since: Oracle 11. One-liner: yes. CLOB support: no. Distinguishability: no. Ordering: yes.
+**LISTAGG.** Since: Oracle 11. One-liner: yes. CLOB support: no. Distinguishability: since 19. Ordering: yes.
 
 Here is the table:
 
@@ -895,9 +895,9 @@ SYS_CONNECT_BY_PATH | 9 | - | - | - | + |
 HIERARCHY | 9 | - | + | - | + |
 STRING_AGG / CLOB_AGG | 9 | + | + | + | - |
 XMLAgg | 9 | + | + | - | + |
-WM_CONCAT | 10 | + | Since 10.2.0.5.0 | + | - | Unofficial, undocumented
+WM_CONCAT | 10 | + | Since 10.2.0.5.0 | + | - | Unofficial, undocumented, removed in 12
 COLLECT | 10 | + | For output only | - | - |
-LISTAGG | 11 | + | - | - | + |
+LISTAGG | 11 | + | - | Since 19 | + |
 
 So, there's no ideal method. But some disadvantages can be avoided.
 
