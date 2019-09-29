@@ -885,6 +885,20 @@ A package with syntax similar to SYS_CONNECT_BY_PATH. See: [this thread](https:/
 
 **XMLAgg.** Since: Oracle 9. One-liner: yes, verbose. CLOB support: yes. Distinguishability: no. Ordering: yes.
 
+Here is the table:
+
+Method | Min. version | One-liner | CLOB | Distinct | Sorting | Notes
+:-- | :--: | :--: | :--: | :--: | :--: | :--
+LISTAGG | 11 | + | - | - | + |
+WM_CONCAT | 10 | + | Since 10.2.0.5.0 | + | - | Unofficial, undocumented
+STRING_AGG / CLOB_AGG | 9 | + | + | + | - |
+Specific function | 8 | + | + | + | + | Should be written for each query
+Generic function | 8 | + | + | + | + | Uses dynamic sql - floods cache. May lead to code duplication.
+SYS_CONNECT_BY_PATH | 9 | - | - | - | + |
+HIERARCHY | 9 | - | + | - | + |
+COLLECT | 10 | + | For output only | - | - |
+XMLAgg | 9 | + | + | - | + |
+
 So, there's no ideal method. But some disadvantages can be avoided.
 
 Distinguishability.
