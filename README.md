@@ -856,18 +856,6 @@ The main properties of the methods described are:
 
 The methods are:
 
-**LISTAGG.** Since: Oracle 11. One-liner: yes. CLOB support: no. Distinguishability: no. Ordering: yes.
-
-**WM_CONCAT.** Since: Oracle 10. One-liner: yes. CLOB support: since 10.2.0.5.0. Distinguishability: yes. Ordering: no.
-Unofficial. Undocumented. It's better to use string_agg or clob_agg instead.
-
-**STRING_AGG.** Since: Oracle 9. One-liner: yes. CLOB support: no. Distinguishability: yes. Ordering: no.
-This is a user-defined function. See: string_agg.sql. It is a slightly modified version of Tom Kyte's [function](https://asktom.oracle.com/pls/apex/f?p=100:11:0::::P11_QUESTION_ID:2196162600402).
-The original one produced an error when the aggregated string exceeds 4000 characters. Modified function cuts the output.
-
-**CLOB_AGG.** Since: Oracle 9. One-liner: yes. CLOB support: yes. Distinguishability: yes. Ordering: no.
-This is an overloaded version of string_agg for CLOB argument. See: clob_agg.sql.
-
 **Specific function.** Since: Oracle 8. One-liner: yes. CLOB support: yes. Distinguishability: yes. Ordering: yes.
 A PL/SQL function that performs additional query inside to retrieve aggregated string. Should be written again and again for every new query.
 
@@ -881,23 +869,35 @@ It is described in Tom Kyte's [blog](https://asktom.oracle.com/pls/asktom/f?p=10
 **HIERARCHY.** Since: Oracle 9. One-liner: no. CLOB support: yes. Distinguishability: no. Ordering: yes.
 A package with syntax similar to SYS_CONNECT_BY_PATH. See: [this thread](https://community.oracle.com/thread/965324).
 
-**COLLECT.** Since: Oracle 10. One-liner: yes. CLOB support: yes for output, no for input. Distinguishability: no. Ordering: no.
+**STRING_AGG.** Since: Oracle 9. One-liner: yes. CLOB support: no. Distinguishability: yes. Ordering: no.
+This is a user-defined function. See: string_agg.sql. It is a slightly modified version of Tom Kyte's [function](https://asktom.oracle.com/pls/apex/f?p=100:11:0::::P11_QUESTION_ID:2196162600402).
+The original one produced an error when the aggregated string exceeds 4000 characters. Modified function cuts the output.
+
+**CLOB_AGG.** Since: Oracle 9. One-liner: yes. CLOB support: yes. Distinguishability: yes. Ordering: no.
+This is an overloaded version of string_agg for CLOB argument. See: clob_agg.sql.
 
 **XMLAgg.** Since: Oracle 9. One-liner: yes, verbose. CLOB support: yes. Distinguishability: no. Ordering: yes.
+
+**WM_CONCAT.** Since: Oracle 10. One-liner: yes. CLOB support: since 10.2.0.5.0. Distinguishability: yes. Ordering: no.
+Unofficial. Undocumented. It's better to use string_agg or clob_agg instead.
+
+**COLLECT.** Since: Oracle 10. One-liner: yes. CLOB support: yes for output, no for input. Distinguishability: no. Ordering: no.
+
+**LISTAGG.** Since: Oracle 11. One-liner: yes. CLOB support: no. Distinguishability: no. Ordering: yes.
 
 Here is the table:
 
 Method | Min. version | One-liner | CLOB | Distinct | Sorting | Notes
 :-- | :--: | :--: | :--: | :--: | :--: | :--
-LISTAGG | 11 | + | - | - | + |
-WM_CONCAT | 10 | + | Since 10.2.0.5.0 | + | - | Unofficial, undocumented
-STRING_AGG / CLOB_AGG | 9 | + | + | + | - |
 Specific function | 8 | + | + | + | + | Should be written for each query
 Generic function | 8 | + | + | + | + | Uses dynamic sql - floods cache. May lead to code duplication.
 SYS_CONNECT_BY_PATH | 9 | - | - | - | + |
 HIERARCHY | 9 | - | + | - | + |
-COLLECT | 10 | + | For output only | - | - |
+STRING_AGG / CLOB_AGG | 9 | + | + | + | - |
 XMLAgg | 9 | + | + | - | + |
+WM_CONCAT | 10 | + | Since 10.2.0.5.0 | + | - | Unofficial, undocumented
+COLLECT | 10 | + | For output only | - | - |
+LISTAGG | 11 | + | - | - | + |
 
 So, there's no ideal method. But some disadvantages can be avoided.
 
