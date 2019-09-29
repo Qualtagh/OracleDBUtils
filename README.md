@@ -917,10 +917,12 @@ by splitting comma-separated string, ordering and concatenating results back.
 We cannot get results ordered by other query fields: only with a subquery or with a built-in syntax of aggregation function.
 So, ideal candidate method should be one-liner with CLOB and ordering support. The only such method is XMLAgg.
 How to add distinguishability to it?
+
+This is a simple use case of XMLAgg:
 ```sql
 select substr( replace( replace( XMLAgg( XMLElement( "elem", DUMMY ) ).getStringVal(), '</elem>' ), '<elem>', ', ' ), 3 ) from dual
 ```
-This is a simple use case of XMLAgg. Let's add some ordering to it:
+Let's add some ordering to it:
 ```sql
 select substr( replace( replace( XMLAgg( XMLElement( "elem", DUMMY ) order by DUMMY ).getStringVal(), '</elem>' ), '<elem>', ', ' ), 3 ) from dual
 ```
