@@ -864,6 +864,9 @@ A PL/SQL function that performs a *dynamic* query inside. Should be written once
 It takes table name and field name as arguments. It can be expanded to take varchar2 query as argument. This would lead to code duplication.
 It is described in Tom Kyte's [blog](https://asktom.oracle.com/pls/asktom/f?p=100:11:::::P11_QUESTION_ID:229614022562).
 
+**Ref Cursor function.** Since: Oracle 8. One-liner: no. CLOB support: yes. Distinguishability: yes. Ordering: yes.
+A PL/SQL function that accepts [cursor expression](https://docs.oracle.com/cd/A87860_01/doc/server.817/a85397/expressi.htm#1002754) as an argument. Leads to code duplication. [Described here](https://oracle-base.com/articles/misc/string-aggregation-techniques#generic_function_using_ref_cursor).
+
 **SYS_CONNECT_BY_PATH.** Since: Oracle 9. One-liner: no. CLOB support: no. Distinguishability: no. Ordering: yes.
 
 **HIERARCHY.** Since: Oracle 9. One-liner: no. CLOB support: yes. Distinguishability: no. Ordering: yes.
@@ -890,7 +893,8 @@ Here is the table:
 Method | Min. version | One-liner | CLOB | Distinct | Sorting | Notes
 :-- | :--: | :--: | :--: | :--: | :--: | :--
 Specific function | 8 | + | + | + | + | Should be written for each query
-Generic function | 8 | + | + | + | + | Uses dynamic sql - floods cache. May lead to code duplication.
+Generic function | 8 | + | + | + | + | Uses dynamic sql - either very limited or leads to code duplication
+Ref Cursor function | 8 | - | + | + | + | Requires query to be duplicated
 SYS_CONNECT_BY_PATH | 9 | - | - | - | + |
 HIERARCHY | 9 | - | + | - | + |
 STRING_AGG / CLOB_AGG | 9 | + | + | + | - |
