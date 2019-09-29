@@ -893,7 +893,7 @@ Here is the table:
 Method | Min. version | One-liner | CLOB | Distinct | Sorting | Notes
 :-- | :--: | :--: | :--: | :--: | :--: | :--
 Specific function | 8 | + | + | + | + | Should be written for each query
-Generic function | 8 | + | + | + | + | Uses dynamic sql - either very limited or leads to code duplication
+Generic function | 8 | + | + | + | + | Uses dynamic SQL - either very limited or requires query to be duplicated
 Ref Cursor function | 8 | - | + | + | + | Requires query to be duplicated
 SYS_CONNECT_BY_PATH | 9 | - | - | - | + |
 HIERARCHY | 9 | - | + | - | + |
