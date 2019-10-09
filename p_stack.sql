@@ -318,7 +318,8 @@ begin
           select SQL_FULLTEXT, PARSING_SCHEMA_NAME
           into tSqlFullText, tOwner
           from V$SQL
-          where CHILD_ADDRESS = tHandle;
+          where CHILD_ADDRESS = tHandle
+            or CHILD_ADDRESS = hextoraw( substr( tHandle, 9 ) );
         exception
           when NO_DATA_FOUND then
             tSqlFullText := null;
