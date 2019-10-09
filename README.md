@@ -5,47 +5,47 @@ Written and tested for Oracle 10.2 (should work for later versions, some parts m
 Contents:
 
 1. [p_admin](#p_admin)
-  1. [killSession](#killSession)
-  2. [killAllSessions](#killAllSessions)
-  3. [killDevelopersSessions](#killDevelopersSessions)
-  4. [killUserSessions](#killUserSessions)
-  5. [killUserTestSessions](#killUserTestSessions)
-  6. [killJob](#killJob)
-  7. [pauseAllJobs](#pauseAllJobs)
-  8. [pauseJob](#pauseJob)
-  9. [pauseJobsLike](#pauseJobsLike)
-  10. [getSessionId](#getSessionId)
-  11. [getJobId](#getJobId)
+    1. [killSession](#killSession)
+    2. [killAllSessions](#killAllSessions)
+    3. [killDevelopersSessions](#killDevelopersSessions)
+    4. [killUserSessions](#killUserSessions)
+    5. [killUserTestSessions](#killUserTestSessions)
+    6. [killJob](#killJob)
+    7. [pauseAllJobs](#pauseAllJobs)
+    8. [pauseJob](#pauseJob)
+    9. [pauseJobsLike](#pauseJobsLike)
+    10. [getSessionId](#getSessionId)
+    11. [getJobId](#getJobId)
 2. [p_utils](#p_utils)
-  1. [numberToChar](#numberToChar)
-  2. [getAssociativeArray](#getAssociativeArray)
-  3. [getAssociativeArrayKeys](#getAssociativeArrayKeys)
-  4. [getAssociativeArrayValues](#getAssociativeArrayValues)
-  5. [truncToSeconds](#truncToSeconds)
-  6. [distinguishXML](#distinguishXML)
-  7. [calculate](#calculate)
+    1. [numberToChar](#numberToChar)
+    2. [getAssociativeArray](#getAssociativeArray)
+    3. [getAssociativeArrayKeys](#getAssociativeArrayKeys)
+    4. [getAssociativeArrayValues](#getAssociativeArrayValues)
+    5. [truncToSeconds](#truncToSeconds)
+    6. [distinguishXML](#distinguishXML)
+    7. [calculate](#calculate)
 3. [p_stack](#p_stack)
-  1. [getCallStack](#getCallStack)
-  2. [whoAmI](#whoAmI)
-  3. [whoCalledMe](#whoCalledMe)
-  4. [getCallStackLine](#getCallStackLine)
-  5. [getDynamicDepth](#getDynamicDepth)
-  6. [getLexicalDepth](#getLexicalDepth)
-  7. [getUnitLine](#getUnitLine)
-  8. [getOwner](#getOwner)
-  9. [getProgram](#getProgram)
-  10. [getProgramType](#getProgramType)
-  11. [getSubprogram](#getSubprogram)
-  12. [getSubprogramType](#getSubprogramType)
-  13. [getSubprograms](#getSubprograms)
-  14. [getSubprogramsTypes](#getSubprogramsTypes)
-  15. [getConcatenatedSubprograms](#getConcatenatedSubprograms)
-  16. [getErrorStack](#getErrorStack)
-  17. [getErrorDepth](#getErrorDepth)
-  18. [getErrorCode](#getErrorCode)
-  19. [getErrorMessage](#getErrorMessage)
-  20. [getBacktraceStack](#getBacktraceStack)
-  21. [getBacktraceDepth](#getBacktraceDepth)
+    1. [getCallStack](#getCallStack)
+    2. [whoAmI](#whoAmI)
+    3. [whoCalledMe](#whoCalledMe)
+    4. [getCallStackLine](#getCallStackLine)
+    5. [getDynamicDepth](#getDynamicDepth)
+    6. [getLexicalDepth](#getLexicalDepth)
+    7. [getUnitLine](#getUnitLine)
+    8. [getOwner](#getOwner)
+    9. [getProgram](#getProgram)
+    10. [getProgramType](#getProgramType)
+    11. [getSubprogram](#getSubprogram)
+    12. [getSubprogramType](#getSubprogramType)
+    13. [getSubprograms](#getSubprograms)
+    14. [getSubprogramsTypes](#getSubprogramsTypes)
+    15. [getConcatenatedSubprograms](#getConcatenatedSubprograms)
+    16. [getErrorStack](#getErrorStack)
+    17. [getErrorDepth](#getErrorDepth)
+    18. [getErrorCode](#getErrorCode)
+    19. [getErrorMessage](#getErrorMessage)
+    20. [getBacktraceStack](#getBacktraceStack)
+    21. [getBacktraceDepth](#getBacktraceDepth)
 4. [utl_call_stack](#utl_call_stack)
 5. [String aggregation](#string-aggregation)
 6. [Links to other packages from various authors](#links-to-other-packages-from-various-authors)
@@ -303,7 +303,7 @@ ___
 ```PLpgSQL
 function distinguishXML( xml in XMLType ) return XMLType;
 ```
-Leave only distinct XML nodes of a document. This method is useful for string aggregation (see section below).
+Leave only distinct XML nodes of a document. This method is useful for string aggregation ([see section below](#string-aggregation)).
 ___
 <a name="calculate"></a>
 ```PLpgSQL
@@ -813,13 +813,18 @@ If you simply need a string output in default format then use `dbms_output.put_l
 ___
 **Installation notes:**
 
-Compile types.sql. Then compile p_stack.sql for Oracle 10 and 11, or p_stack.9.sql for Oracle 9. If the `owa` package is not available, replace its usages by commented `chr` functions. If the views `V$SQL` or `V$SQLTEXT_WITH_NEWLINES` are not available, just remove those blocks. The source code of anonymous blocks won't be parsed in this case. But it's not required for most applications.
+Compile types.sql. Then compile p_stack.9.sql for Oracle 9, or p_stack.sql for later versions. If the `owa` package is not available, replace its usages by commented `chr` functions. If the views `V$SQL` or `V$SQLTEXT_WITH_NEWLINES` are not available, just remove those blocks. The source code of anonymous blocks won't be parsed in this case. But it's not required for most applications.
+___
+**Development notes:**
+
+The file p_stack_tests.sql contains a simple set of unit tests.
 ___
 # utl_call_stack
 Oracle 12 provides `utl_call_stack` package for handy call stack traversal.
 This repository contains a backport of `utl_call_stack` for Oracle 9, 10 and 11.
+Also, it can be useful for Oracle 12 which lacks method `unit_type` (appeared in later versions).
 
-Method `current_edition` is not implemented (always returns `null`).
+Methods `current_edition` and `actual_edition` aren't implemented (always return `null`).
 
 The implementation depends on `p_stack` package. Each call to backported `utl_call_stack` functions leads to program unit source code parsing. Package `p_stack` allows to store parsed results and traverse them for output (so, the parsing is done only once).
 
@@ -837,7 +842,7 @@ Don't be scared: it just means that the requested depth is out of range.
 ___
 **Installation notes:**
 
-First, compile `p_stack` as described above. Then compile utl_call_stack.sql for Oracle 10 and 11, or utl_call_stack.9.sql for Oracle 9.
+First, compile `p_stack` as described above. Then compile utl_call_stack.9.sql for Oracle 9, or utl_call_stack.sql for later versions.
 ___
 # String aggregation
 String aggregation techniques are described in details [here](http://oracle-base.com/articles/misc/string-aggregation-techniques.php).
@@ -851,18 +856,6 @@ The main properties of the methods described are:
 
 The methods are:
 
-**LISTAGG.** Since: Oracle 11. One-liner: yes. CLOB support: no. Distinguishability: no. Ordering: yes.
-
-**WM_CONCAT.** Since: Oracle 10. One-liner: yes. CLOB support: since 10.2.0.5.0. Distinguishability: yes. Ordering: no.
-Unofficial. Undocumented. It's better to use string_agg or clob_agg instead.
-
-**STRING_AGG.** Since: Oracle 9. One-liner: yes. CLOB support: no. Distinguishability: yes. Ordering: no.
-This is a user-defined function. See: string_agg.sql. It is a slightly modified version of Tom Kyte's [function](https://asktom.oracle.com/pls/apex/f?p=100:11:0::::P11_QUESTION_ID:2196162600402).
-The original one produced an error when the aggregated string exceeds 4000 characters. Modified function cuts the output.
-
-**CLOB_AGG.** Since: Oracle 9. One-liner: yes. CLOB support: yes. Distinguishability: yes. Ordering: no.
-This is an overloaded version of string_agg for CLOB argument. See: clob_agg.sql.
-
 **Specific function.** Since: Oracle 8. One-liner: yes. CLOB support: yes. Distinguishability: yes. Ordering: yes.
 A PL/SQL function that performs additional query inside to retrieve aggregated string. Should be written again and again for every new query.
 
@@ -871,14 +864,44 @@ A PL/SQL function that performs a *dynamic* query inside. Should be written once
 It takes table name and field name as arguments. It can be expanded to take varchar2 query as argument. This would lead to code duplication.
 It is described in Tom Kyte's [blog](https://asktom.oracle.com/pls/asktom/f?p=100:11:::::P11_QUESTION_ID:229614022562).
 
+**Ref Cursor function.** Since: Oracle 8. One-liner: no. CLOB support: yes. Distinguishability: yes. Ordering: yes.
+A PL/SQL function that accepts [cursor expression](https://docs.oracle.com/cd/A87860_01/doc/server.817/a85397/expressi.htm#1002754) as an argument. Leads to code duplication. [Described here](https://oracle-base.com/articles/misc/string-aggregation-techniques#generic_function_using_ref_cursor).
+
 **SYS_CONNECT_BY_PATH.** Since: Oracle 9. One-liner: no. CLOB support: no. Distinguishability: no. Ordering: yes.
 
 **HIERARCHY.** Since: Oracle 9. One-liner: no. CLOB support: yes. Distinguishability: no. Ordering: yes.
 A package with syntax similar to SYS_CONNECT_BY_PATH. See: [this thread](https://community.oracle.com/thread/965324).
 
-**COLLECT.** Since: Oracle 10. One-liner: yes. CLOB support: yes for output, no for input. Distinguishability: no. Ordering: no.
+**STRING_AGG.** Since: Oracle 9. One-liner: yes. CLOB support: no. Distinguishability: yes. Ordering: no.
+This is a user-defined function. See: string_agg.sql. It is a slightly modified version of Tom Kyte's [function](https://asktom.oracle.com/pls/apex/f?p=100:11:0::::P11_QUESTION_ID:2196162600402).
+The original one produced an error when the aggregated string exceeds 4000 characters. Modified function cuts the output.
+
+**CLOB_AGG.** Since: Oracle 9. One-liner: yes. CLOB support: yes. Distinguishability: yes. Ordering: no.
+This is an overloaded version of string_agg for CLOB argument. See: clob_agg.sql.
 
 **XMLAgg.** Since: Oracle 9. One-liner: yes, verbose. CLOB support: yes. Distinguishability: no. Ordering: yes.
+
+**WM_CONCAT.** Since: Oracle 10. One-liner: yes. CLOB support: since 10.2.0.5.0. Distinguishability: yes. Ordering: no.
+Unofficial. Undocumented. Removed since Oracle 12. It's better to use string_agg or clob_agg instead.
+
+**COLLECT.** Since: Oracle 10. One-liner: yes. CLOB support: yes for output, no for input. Distinguishability: no. Ordering: no.
+
+**LISTAGG.** Since: Oracle 11. One-liner: yes. CLOB support: no. Distinguishability: since 19. Ordering: yes.
+
+Here is the table:
+
+Method | Min. version | One-liner | CLOB | Distinct | Sorting | Notes
+:-- | :--: | :--: | :--: | :--: | :--: | :--
+Specific function | 8 | + | + | + | + | Should be written for each query
+Generic function | 8 | + | + | + | + | Uses dynamic SQL - either very limited or requires query to be duplicated
+Ref Cursor function | 8 | - | + | + | + | Requires query to be duplicated
+SYS_CONNECT_BY_PATH | 9 | - | - | - | + |
+HIERARCHY | 9 | - | + | - | + |
+STRING_AGG / CLOB_AGG | 9 | + | + | + | - |
+XMLAgg | 9 | + | + | - | + |
+WM_CONCAT | 10 | + | Since 10.2.0.5.0 | + | - | Unofficial, undocumented, removed in 12
+COLLECT | 10 | + | For output only | - | - |
+LISTAGG | 11 | + | - | Since 19 | + |
 
 So, there's no ideal method. But some disadvantages can be avoided.
 
@@ -898,10 +921,12 @@ by splitting comma-separated string, ordering and concatenating results back.
 We cannot get results ordered by other query fields: only with a subquery or with a built-in syntax of aggregation function.
 So, ideal candidate method should be one-liner with CLOB and ordering support. The only such method is XMLAgg.
 How to add distinguishability to it?
+
+This is a simple use case of XMLAgg:
 ```sql
 select substr( replace( replace( XMLAgg( XMLElement( "elem", DUMMY ) ).getStringVal(), '</elem>' ), '<elem>', ', ' ), 3 ) from dual
 ```
-This is a simple use case of XMLAgg. Let's add some ordering to it:
+Let's add some ordering to it:
 ```sql
 select substr( replace( replace( XMLAgg( XMLElement( "elem", DUMMY ) order by DUMMY ).getStringVal(), '</elem>' ), '<elem>', ', ' ), 3 ) from dual
 ```
