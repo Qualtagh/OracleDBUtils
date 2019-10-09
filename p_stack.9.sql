@@ -179,7 +179,7 @@ procedure parseCallStackLine( tCallPositionsLine in varchar2, tHandle out raw, t
 begin
   pos := instr( tCallLine, ' ' );
   if pos > 0 then
-    tHandle := hextoraw( substr( tCallLine, 1, pos - 1 ) );
+    tHandle := hextoraw( replace( substr( tCallLine, 1, pos - 1 ), '0x', '' ) );
     tCallLine := ltrim( substr( tCallLine, pos ) );
   else
     tHandle := null;
