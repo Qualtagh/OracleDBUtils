@@ -210,6 +210,24 @@ begin
   end if;
 end;
 
+function cutQuotes( str in varchar2 ) return varchar2 is
+  ret varchar2( 4000 ) := str;
+  pos_from pls_integer;
+  pos_to pls_integer;
+begin
+  loop
+    pos_from := instr( ret, '"' );
+    if pos_from is null or pos_from = 0 then
+      return ret;
+    end if;
+    pos_to := instr( ret, '"', pos_from + 1 );
+    if pos_to is null or pos_to = 0 then
+      return ret;
+    end if;
+    ret := substr( ret, 1, pos_from - 1 ) || substr( ret, pos_to + 1 );
+  end loop;
+end;
+
 -- Returns a call stack. The call of this procedure is included and is at the first line.
 -- tDepth: which line of stack to show. Lesser numbers are most recent calls. Numeration starts from 1.
 -- The call of this procedure has depth = 1.
@@ -689,9 +707,7 @@ end;
 function getLexicalDepth( tCallStack in varchar2, tDepth in number default null ) return number is
   tCallLine varchar2( 4000 ) := case when tDepth is null then tCallStack else getCallStackLine( tCallStack, tDepth ) end;
 begin
-  if tCallLine like '%"%' then
-    tCallLine := regexp_replace( tCallLine, '"[^"]*"' );
-  end if;
+  tCallLine := cutQuotes( tCallLine );
   return greatest( nvl( length( tCallLine ) - length( replace( tCallLine, '.' ) ) - 1, 0 ), 0 );
 end;
 
