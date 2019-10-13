@@ -219,26 +219,42 @@ function distinguishXML( xml in XMLType ) return XMLType is
   capacity pls_integer := 32;
   j pls_integer := 1;
 begin
-  select value( t )
-  bulk collect into nodes
-  from XMLTable( '/*' passing xml ) t;
+  $if dbms_db_version.ver_le_10 $then
+    select XMLSequence( xml )
+    into nodes
+    from dual;
+  $else
+    select value( t )
+    bulk collect into nodes
+    from XMLTable( '/*' passing xml ) t;
+  $end
   retNodes.extend( capacity );
   for i in 1 .. nodes.count loop
-    text := nodes( i ).getStringVal();
+    text := trim( nodes( i ).getStringVal() );
     if not idx.exists( text ) then
       idx( text ) := null;
       if j > capacity then
         retNodes.extend( capacity / 2 );
         capacity := capacity * 3 / 2;
       end if;
-      retNodes( j ) := nodes( i );
+      $if dbms_db_version.ver_le_10 $then
+        retNodes( j ) := XMLType( text );
+      $else
+        retNodes( j ) := nodes( i );
+      $end
       j := j + 1;
     end if;
   end loop;
   retNodes.trim( capacity - j + 1 );
-  select XMLAgg( value( t ) )
-  into ret
-  from table( retNodes ) t;
+  $if dbms_db_version.ver_le_10 $then
+    select XMLConcat( retNodes )
+    into ret
+    from dual;
+  $else
+    select XMLAgg( value( t ) )
+    into ret
+    from table( retNodes ) t;
+  $end
   return ret;
 end;
 
