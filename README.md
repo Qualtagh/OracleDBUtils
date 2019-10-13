@@ -320,7 +320,7 @@ For more operations (and big fractions) use Java package org.quinto.math (coming
 ___
 **Installation notes:**
 
-Compile types.sql and fraction.sql, then p_utils.sql. Java rights are needed only for "calculate" function.
+Compile types.sql and fraction.sql, then p_utils.9.sql for Oracle 9 or p_utils.sql for later versions. Java rights are needed only for "calculate" function.
 ___
 **Development notes:**
 
