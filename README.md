@@ -920,21 +920,50 @@ by splitting comma-separated string, ordering and concatenating results back.
 
 We cannot get results ordered by other query fields: only with a subquery or with a built-in syntax of aggregation function.
 So, ideal candidate method should be one-liner with CLOB and ordering support. The only such method is XMLAgg.
-How to add distinguishability to it?
 
-This is a simple use case of XMLAgg:
+How to add distinguishability to it? Use `p_utils.distinguishXML` - it leaves only distinct XML nodes of the aggregated input.
+
+Also, you may need [dbms_xmlgen.convert](https://docs.oracle.com/cd/B19306_01/appdev.102/b14258/d_xmlgen.htm#i1013100) to unescape special characters in resulting string.
+
+Example:
 ```sql
-select substr( replace( replace( XMLAgg( XMLElement( "elem", DUMMY ) ).getStringVal(), '</elem>' ), '<elem>', ', ' ), 3 ) from dual
+with EMPLOYEES as (
+  select 'Sales' as DEPARTMENT, 'John' as NAME, 'Butler' as SURNAME from dual union all
+  select 'Sales', 'John', 'Kelly' from dual union all
+  select 'Sales', 'Jane', 'Kelly' from dual union all
+  select 'Devs', 'Ruth', 'Ostin' from dual union all
+  select 'Devs', 'Gareth', 'Pink' from dual union all
+  select 'Devs', 'Cli''igan', 'Moorney' from dual union all
+  select 'Devs', 'Ruth', 'Zack' from dual
+)
+select DEPARTMENT,
+       dbms_xmlgen.convert(
+         substr(
+           replace(
+             replace(
+               p_utils.distinguishXML(
+                 XMLAgg(
+                   XMLElement( "elem", NAME )
+                   order by SURNAME
+                 )
+               ).getStringVal(), '</elem>'
+             ), '<elem>', ', '
+           ), 3
+         ), 1
+       ) as NAMES
+from EMPLOYEES
+group by DEPARTMENT
+order by DEPARTMENT
 ```
-Let's add some ordering to it:
-```sql
-select substr( replace( replace( XMLAgg( XMLElement( "elem", DUMMY ) order by DUMMY ).getStringVal(), '</elem>' ), '<elem>', ', ' ), 3 ) from dual
-```
-Note that we can use other fields in order clause, not only the aggregated one. An example with distinguishability using p_utils package:
-```sql
-select substr( replace( replace( p_utils.distinguishXML( XMLAgg( XMLElement( "elem", DUMMY ) order by DUMMY ) ).getStringVal(), '</elem>' ), '<elem>', ', ' ), 3 ) from dual
-```
-p_utils.distinguishXML leaves only distinct XML nodes of the aggregated input. Then we get string value of it (or CLOB using getClobVal instead of getStringVal).
+
+Result:
+
+DEPARTMENT | NAMES
+:-- | :--
+Devs | Cli'igan, Ruth, Gareth
+Sales | John, Jane
+
+Employees are ordered by surname and only distinct names are left. Use `getClobVal` instead of `getStringVal` if you expect long results.
 ___
 # Links to other packages from various authors
 [XT_REGEXP](https://github.com/xtender/XT_REGEXP) from Sayan Malakshinov aka XTender. This package lets using of Java regular expressions inside SQL. Java regular expressions are more powerful than built-in functions regexp_substr, regexp_replace etc.
