@@ -37,6 +37,8 @@ end;
 /
 create or replace package body p_utils is
 
+BLANK_CHARS constant varchar2( 4 ) := ' ' || chr( 9 ) || chr( 10 ) || chr( 13 );
+
 -- Standard to_char( 0.23 ) returns '.23', this function adds zero when needed ('0.23' for the example above).
 -- See: http://stackoverflow.com/questions/6695604/oracle-why-does-the-leading-zero-of-a-number-disappear-when-converting-it-to-c
 function numberToChar( tNumber in number ) return varchar2 is
@@ -230,7 +232,8 @@ begin
   $end
   retNodes.extend( capacity );
   for i in 1 .. nodes.count loop
-    text := trim( nodes( i ).getStringVal() );
+    text := nodes( i ).getStringVal();
+    text := ltrim( rtrim( text, BLANK_CHARS ), BLANK_CHARS );
     if not idx.exists( text ) then
       idx( text ) := null;
       if j > capacity then
