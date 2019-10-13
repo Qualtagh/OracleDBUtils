@@ -210,6 +210,8 @@ begin
   end if;
 end;
 
+-- Remove subsequences inside double quotes (quotes themselves are removed as well)
+-- Private function.
 function cutQuotes( str in varchar2 ) return varchar2 is
   ret varchar2( 4000 ) := str;
   pos_from pls_integer;
@@ -325,6 +327,7 @@ begin
               and HASH_VALUE = :tHashValue'
           into tSqlFullText
           using tHandle, tHashValue;
+          tSqlFullText := dbms_xmlgen.convert( tSqlFullText, 1 );
           begin
             select USERNAME
             into tOwner
