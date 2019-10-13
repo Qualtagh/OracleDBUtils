@@ -219,9 +219,9 @@ function distinguishXML( xml in XMLType ) return XMLType is
   capacity pls_integer := 32;
   j pls_integer := 1;
 begin
-  select XMLSequence( xml )
-  into nodes
-  from dual;
+  select value( t )
+  bulk collect into nodes
+  from XMLTable( '/*' passing xml ) t;
   retNodes.extend( capacity );
   for i in 1 .. nodes.count loop
     text := nodes( i ).getStringVal();
