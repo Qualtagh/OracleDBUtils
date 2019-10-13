@@ -322,6 +322,10 @@ ___
 
 Compile types.sql and fraction.sql, then p_utils.sql. Java rights are needed only for "calculate" function.
 ___
+**Development notes:**
+
+The file p_utils_tests.sql contains a simple set of unit tests.
+___
 # p_stack
 A package for call stack control.
 
