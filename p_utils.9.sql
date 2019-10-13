@@ -225,20 +225,21 @@ begin
   retNodes.extend( capacity );
   for i in 1 .. nodes.count loop
     text := nodes( i ).getStringVal();
+    text := substr( text, 1, length( text ) - 1 );
     if not idx.exists( text ) then
       idx( text ) := null;
       if j > capacity then
         retNodes.extend( capacity / 2 );
         capacity := capacity * 3 / 2;
       end if;
-      retNodes( j ) := nodes( i );
+      retNodes( j ) := XMLType( text );
       j := j + 1;
     end if;
   end loop;
   retNodes.trim( capacity - j + 1 );
-  select XMLAgg( value( t ) )
+  select XMLConcat( retNodes )
   into ret
-  from table( retNodes ) t;
+  from dual;
   return ret;
 end;
 
