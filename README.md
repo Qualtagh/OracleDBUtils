@@ -888,6 +888,9 @@ Unofficial. Undocumented. Removed since Oracle 12. It's better to use string_agg
 
 **LISTAGG.** Since: Oracle 11. One-liner: yes. CLOB support: no. Distinguishability: since 19. Ordering: yes.
 
+**JSON_ArrayAgg.** Since: Oracle 12. One-liner: yes. CLOB support: yes. Distinguishability: no. Ordering: yes.
+See at this blog post [how to concatenate strings with JSON_ArrayAgg](https://stewashton.wordpress.com/2019/08/19/making-longer-lists/).
+
 Here is the table:
 
 Method | Min. version | One-liner | CLOB | Distinct | Sorting | Notes
@@ -902,6 +905,7 @@ XMLAgg | 9 | + | + | - | + |
 WM_CONCAT | 10 | + | Since 10.2.0.5.0 | + | - | Unofficial, undocumented, removed in 12
 COLLECT | 10 | + | For output only | - | - |
 LISTAGG | 11 | + | - | Since 19 | + |
+JSON_ArrayAgg | 12 | + | + | - | + |
 
 So, there's no ideal method. But some disadvantages can be avoided.
 
@@ -919,7 +923,7 @@ Ordering.
 by splitting comma-separated string, ordering and concatenating results back.
 
 We cannot get results ordered by other query fields: only with a subquery or with a built-in syntax of aggregation function.
-So, ideal candidate method should be one-liner with CLOB and ordering support. The only such method is XMLAgg.
+So, ideal candidate method should be one-liner with CLOB and ordering support. The only such methods are XMLAgg and JSON_ArrayAgg.
 
 How to add distinguishability to it? Use `p_utils.distinguishXML` - it leaves only distinct XML nodes of the aggregated input.
 
