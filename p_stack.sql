@@ -537,7 +537,7 @@ begin
                   tCallStack( tCallStack.count ) := 'IF';
                 end if;
               elsif tToken = 'BEGIN' then
-                if tPrevToken in ( '>>', 'THEN', 'ELSE', ';', 'IS', 'AS', 'BEGIN', 'LOOP' ) then
+                if tPrevToken in ( '>>', 'THEN', 'ELSE', ';', 'IS', 'AS', 'DECLARE', 'BEGIN', 'LOOP' ) then
                   if tCallStack( tCallStack.count ) like '-%' then
                     tCallStack( tCallStack.count ) := '+' || substr( tCallStack( tCallStack.count ), 2 );
                   else
