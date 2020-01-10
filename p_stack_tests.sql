@@ -131,4 +131,41 @@ end;
 /
 drop package JAVA_PKG;
 /
+create or replace package EMPTY_DECLARE_PKG is
+  procedure GOOD;
+  procedure BAD;
+end;
+/
+create or replace package body EMPTY_DECLARE_PKG is
+  procedure GOOD is
+    tCallStack varchar2( 4000 );
+  begin
+    declare
+      t number;
+    begin
+      null;
+    end;
+    tCallStack := p_stack.getCallStack(2);
+    assert_eq( p_stack.getConcatenatedSubprograms( tCallStack ), 'EMPTY_DECLARE_PKG.GOOD' );
+  end;
+
+  procedure BAD is
+    tCallStack varchar2( 4000 );
+  begin
+    declare
+    begin
+      null;
+    end;
+    tCallStack := p_stack.getCallStack(2);
+    assert_eq( p_stack.getConcatenatedSubprograms( tCallStack ), 'EMPTY_DECLARE_PKG.BAD' );
+  end;
+end;
+/
+begin
+  EMPTY_DECLARE_PKG.GOOD;
+  EMPTY_DECLARE_PKG.BAD;
+end;
+/
+drop package EMPTY_DECLARE_PKG;
+/
 drop procedure assert_eq;
