@@ -298,7 +298,7 @@ begin
           and NAME = tName
           and TYPE = tType
           and LINE <= tLine
-          and TEXT like '%$%'
+          and upper( TEXT ) like '%$IF%'
           and rownum = 1;
         tPreprocessed := dbms_preprocessor.get_post_processed_source( tType, tOwner, tName );
         tCurrentLine := 0;
@@ -327,7 +327,7 @@ begin
       end if;
       tCurrentLine := 0;
       tCallStack := str_table( '', 'ANON' );
-      if tSqlFullText like '%$%' then
+      if upper( tSqlFullText ) like '%$IF%' then
         tSourceType := SOURCE_PREPROCESSOR;
         loop
           pos := instr( tSqlFullText, CHAR_NEW_LINE );
