@@ -30,7 +30,7 @@ begin
 end;
 /
 drop package APCKG;
-/
+
 declare
   procedure inner_proc is
   begin
@@ -130,7 +130,7 @@ begin
 end;
 /
 drop package JAVA_PKG;
-/
+
 create or replace package EMPTY_DECLARE_PKG is
   procedure GOOD;
   procedure BAD;
@@ -167,5 +167,45 @@ begin
 end;
 /
 drop package EMPTY_DECLARE_PKG;
+
+-- No ORA-06502 (Value Error) on tIdentifierName in p_stack.getCallStack
+-- when very long alias is used.
+create or replace procedure TEST_GETCALLSTACK_IDNAME_SIZE
+is
+  v_clob clob;
+begin
+  -- dummy SELECT using XMLFOREST with long aliases
+  -- to check for VALUE ERROR on tIdentifierName in p_stack.getCallStack
+  select
+    xmlserialize(document
+        xmlelement("very_long_xml_namespace_over_30_chars:employees",
+          xmlattributes('http://www.example.com/very_long_xml_namespace_over_30_chars' as "xmlns:very_long_xml_namespace_over_30_chars"),
+          xmlforest(
+            emp.employee_id as "very_long_xml_namespace_over_30_chars:employee_id"
+            , emp.last_name as "very_long_xml_namespace_over_30_chars:last_name"
+            , emp.salary as "very_long_xml_namespace_over_30_chars:salary"
+          )
+        )
+      as CLOB version '1.0' indent size = 2
+    ) doc
+  into v_clob
+  from
+  (
+    select
+      101 as employee_id
+      , 'Doe' as last_name
+      , 'John' as first_name
+      , 123456 as salary
+    from dual
+  ) emp
+  ;
+  assert_eq(p_stack.getConcatenatedSubprograms(p_stack.getCallStack(2)), 'TEST_GETCALLSTACK_IDNAME_SIZE' );
+end TEST_GETCALLSTACK_IDNAME_SIZE;
 /
+begin
+  TEST_GETCALLSTACK_IDNAME_SIZE;
+end;
+/
+drop procedure TEST_GETCALLSTACK_IDNAME_SIZE;
+
 drop procedure assert_eq;
