@@ -252,8 +252,8 @@ function getCallStack( tFormatCallStack in varchar2, tDepth in number default nu
   len pls_integer;
   tCommented pls_integer;
   tIdentifier pls_integer;
-  tIdentifierName varchar2( 30 );
-  tIdentifiers dbms_sql.varchar2_table;
+  tIdentifierName varchar2( 32767 );
+  tIdentifiers dbms_sql.varchar2a;
   tMaxIdentifier pls_integer;
   tQuoteDelimiter char;
   tString pls_integer;
